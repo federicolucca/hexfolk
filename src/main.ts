@@ -19,6 +19,7 @@ import { type Bounds, mapBounds, pixelToHex } from './render/layout';
 import { drawScene, wantsHd } from './render/renderer';
 import { describeTile } from './ui/describe';
 import { applyPalette, createHud } from './ui/hud';
+import { createLegend } from './ui/legend';
 import { parsePlayers, parseSeed, parseTheme, randomSeed, withParams } from './ui/url';
 
 const MAX_PIXEL_RATIO = 2;
@@ -78,6 +79,7 @@ async function start(app: HTMLElement): Promise<void> {
   const showTheme = async (refit: boolean): Promise<void> => {
     const token = ++loadToken;
     hud.setTheme(themeOverride, theme());
+    legend.setTheme(theme());
     const loaded = await loader.load(theme());
     if (token !== loadToken) return;
     atlas = loaded;
@@ -112,6 +114,7 @@ async function start(app: HTMLElement): Promise<void> {
     },
   });
   hud.setMessage('Loading…');
+  const legend = createLegend(app, `${import.meta.env.BASE_URL}atlas/`);
 
   const resize = (): void => {
     const rect = canvas.getBoundingClientRect();
