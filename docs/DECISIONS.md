@@ -192,3 +192,12 @@ Choices made where the brief changed or was ambiguous. Newest first.
   walls on a threatened city, train, and finally move towards the nearest city it does not own (else the nearest enemy).
 - A unit on one of its own cities stays put while an enemy is within 3 hexes (the defence rule).
 - It has no lookahead and no hidden information, so one turn takes a few milliseconds.
+
+## Milestone (f): victory and save
+
+- Domination: a player whose capital is taken is eliminated; the last one standing wins at once.
+- Turn limit: when round 30 is over, the highest score wins and a tie is a draw. Score = 5 per city
+  + 1 per population + 2 per tech + 1 per unit; eliminated players score 0.
+- Autosave writes the whole state to localStorage at the end of every turn (after the human's and after the AIs').
+  A reload resumes it unless the URL has a different `?seed=`. A new game takes the typed seed, or a random one.
+- Players: 2 to 4 (`?players=`, default 4), player 0 is the human and the rest are greedy AIs.
