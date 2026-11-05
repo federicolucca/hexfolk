@@ -2,7 +2,7 @@
 import { GreedyAgent } from './core/ai';
 import { income } from './core/economy';
 import { newGame } from './core/engine';
-import type { HexRef } from './core/state';
+import type { GameState, HexRef } from './core/state';
 import { type Theme, themeFromSeed } from './core/theme';
 import { frameExtents } from './render/atlas';
 import { AtlasLoader, type LoadedAtlas, type LoadedCommon } from './render/atlasLoader';
@@ -20,9 +20,10 @@ import {
 import { attachInput } from './render/input';
 import { type Bounds, hexToPixel, mapBounds, pixelToHex } from './render/layout';
 import { drawScene, wantsHd } from './render/renderer';
-import { describeHex, playerName, starsLine, turnLine } from './ui/describe';
+import { describeHex, endSummary, playerName, starsLine, turnLine } from './ui/describe';
 import { panelFor, techPanel } from './ui/panels';
 import { applyPalette, createHud } from './ui/hud';
+import { loadGame, saveGame } from './ui/save';
 import { Session } from './ui/session';
 import { parsePlayers, parseSeed, parseTheme, randomSeed, withParams } from './ui/url';
 
@@ -41,9 +42,20 @@ async function start(app: HTMLElement): Promise<void> {
   const atlasBase = `${import.meta.env.BASE_URL}atlas/`;
   const loader = new AtlasLoader(atlasBase);
   const players = parsePlayers(location.search);
-  let seed = parseSeed(location.search) ?? randomSeed();
+  const store = ((): Storage | undefined => {
+    try {
+      return localStorage;
+    } catch {
+      return undefined;
+    }
+  })();
+  const urlSeed = parseSeed(location.search);
+  // Resume the autosave unless the URL asks for a different seed.
+  const saved = loadGame(store);
+  const resume = saved && (urlSeed === undefined || urlSeed === saved.seed) ? saved : null;
+  let seed = resume?.seed ?? urlSeed ?? randomSeed();
   let themeOverride = parseTheme(location.search);
-  let session = createSession(seed);
+  let session = createSession(seed, resume);
   let theme: LoadedAtlas | null = null;
   let common: LoadedCommon | null = null;
   let bounds: Bounds | null = null;
@@ -55,9 +67,10 @@ async function start(app: HTMLElement): Promise<void> {
   let busy = false;
   let showTechs = false;
 
-  function createSession(s: number): Session {
-    const agents = Object.fromEntries(Array.from({ length: players }, (_, i) => [i, new GreedyAgent()]));
-    return new Session(newGame({ seed: s, players }), HUMAN, agents);
+  function createSession(s: number, from: GameState | null = null): Session {
+    const count = from?.players.length ?? players;
+    const agents = Object.fromEntries(Array.from({ length: count }, (_, i) => [i, new GreedyAgent()]));
+    return new Session(from ?? newGame({ seed: s, players }), HUMAN, agents);
   }
 
   const themeName = (): Theme => themeOverride ?? themeFromSeed(seed);
@@ -87,6 +100,7 @@ async function start(app: HTMLElement): Promise<void> {
     const waiting = `${playerName(state.current)} is playing…`;
     hud.setInfo(info?.title ?? (session.humanToMove ? 'Your turn' : waiting), info?.detail ?? (session.humanToMove ? 'Tap a unit or a city' : ''));
     hud.setEndTurn(session.humanToMove && !busy);
+    hud.setEnd(endSummary(state, HUMAN));
     hud.setTools([
       {
         label: 'Techs',
@@ -154,9 +168,10 @@ async function start(app: HTMLElement): Promise<void> {
   };
 
   const hud = createHud(app, {
-    onNewGame: () => {
-      seed = randomSeed();
+    onNewGame: (typed) => {
+      seed = typed ?? randomSeed();
       session = createSession(seed);
+      saveGame(store, session.state);
       syncUrl();
       showTheme(true).catch(fail);
     },
@@ -170,9 +185,13 @@ async function start(app: HTMLElement): Promise<void> {
       busy = true;
       refresh();
       session
-        .endTurn(() => refresh())
+        .endTurn(() => {
+          saveGame(store, session.state);
+          refresh();
+        })
         .catch(fail)
         .finally(() => {
+          saveGame(store, session.state);
           busy = false;
           refresh();
         });

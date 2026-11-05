@@ -54,3 +54,11 @@ export function territoryCity(state: GameState, player: number, hex: HexRef): Ci
   }
   return best;
 }
+
+/** Final score: 5 per city, 1 per population, 2 per tech and 1 per unit. Eliminated players score 0. */
+export function score(state: GameState, player: number): number {
+  const p = state.players[player];
+  if (!p?.alive) return 0;
+  const cities = state.cities.filter((c) => c.owner === player);
+  return cities.length * 5 + cities.reduce((n, c) => n + c.population, 0) + p.techs.length * 2 + state.units.filter((u) => u.owner === player).length;
+}

@@ -18,6 +18,8 @@ export interface Card {
 
 export interface Hud {
   setSeed(seed: number): void;
+  /** The end screen with a New game button; null hides it. */
+  setEnd(summary: { title: string; lines: string[] } | null): void;
   /** The override in the select (undefined = Auto) and the theme in use. */
   setTheme(override: Theme | undefined, effective: Theme): void;
   /** Turn line and the line below it (e.g. stars). */
@@ -35,7 +37,8 @@ export interface Hud {
 }
 
 export interface HudActions {
-  onNewGame(): void;
+  /** `seed` is what the player typed, or null for a random one. */
+  onNewGame(seed: number | null): void;
   /** undefined means "Auto": the theme follows the seed. */
   onThemeChange(theme: Theme | undefined): void;
   onEndTurn(): void;
@@ -85,7 +88,10 @@ export function createHud(container: HTMLElement, actions: HudActions): Hud {
   };
 
   const bar = element('div', 'hf-bar');
-  const seed = element('span', 'hf-seed');
+  const seed = element('input', 'hf-select hf-seed');
+  seed.setAttribute('aria-label', 'Seed');
+  seed.inputMode = 'numeric';
+  seed.size = 10;
   const select = element('select', 'hf-select');
   select.setAttribute('aria-label', 'Theme');
   const auto = element('option', '', 'Auto');
@@ -94,7 +100,8 @@ export function createHud(container: HTMLElement, actions: HudActions): Hud {
   select.addEventListener('change', () => actions.onThemeChange(THEMES.find((t) => t === select.value)));
   const newGame = element('button', 'hf-button hf-secondary', 'New game');
   newGame.type = 'button';
-  newGame.addEventListener('click', actions.onNewGame);
+  const requestNew = (): void => actions.onNewGame(/^\d{1,10}$/.test(seed.value.trim()) ? Number(seed.value.trim()) : null);
+  newGame.addEventListener('click', requestNew);
   const tools = element('span');
   tools.style.display = 'contents';
   bar.append(element('span', 'hf-title', 'hexfolk'), seed, select, newGame, tools);
@@ -117,10 +124,13 @@ export function createHud(container: HTMLElement, actions: HudActions): Hud {
   const message = element('div', 'hf-message');
   message.hidden = true;
 
-  container.append(bar, panel, dock, message);
+  const end = element('div', 'hf-end');
+  end.hidden = true;
+
+  container.append(bar, panel, dock, message, end);
   return {
     setSeed: (value) => {
-      seed.textContent = `Seed ${value}`;
+      seed.value = String(value);
     },
     setTheme: (override, effective) => {
       select.value = override ?? '';
@@ -174,6 +184,15 @@ export function createHud(container: HTMLElement, actions: HudActions): Hud {
     },
     setCommonAtlas: (loaded, baseUrl) => {
       common = { loaded, url: `${baseUrl}${loaded.atlas.images['2']}` };
+    },
+    setEnd: (summary) => {
+      end.hidden = summary === null;
+      end.replaceChildren();
+      if (!summary) return;
+      const again = element('button', 'hf-button', 'New game');
+      again.type = 'button';
+      again.addEventListener('click', requestNew);
+      end.append(element('h2', '', summary.title), ...summary.lines.map((l) => element('p', '', l)), again);
     },
     setMessage: (text) => {
       message.hidden = text === null;

@@ -1,6 +1,7 @@
 // Text for the HUD. Pure: no DOM.
 import { tileAtHex } from '../core/board';
 import type { Terrain } from '../core/map';
+import { score } from '../core/economy';
 import { UNIT_STATS } from '../core/rules';
 import type { City, GameState, HexRef, Unit } from '../core/state';
 import { PALETTE } from '../render/palette';
@@ -45,4 +46,14 @@ export function turnLine(state: GameState): string {
 export function starsLine(state: GameState, player: number, perTurn: number): string {
   const stars = state.players[player]?.stars ?? 0;
   return `★ ${stars} (+${perTurn}/turn)`;
+}
+
+/** The end screen: a headline and one score line per player, or null while the game is on. */
+export function endSummary(state: GameState, human: number): { title: string; lines: string[] } | null {
+  if (!state.over) return null;
+  const title = state.winner === null ? 'Draw' : state.winner === human ? 'Victory!' : 'Defeat';
+  const alive = state.players.filter((p) => p.alive).length;
+  const lines = [alive === 1 ? 'Domination: every enemy capital was taken.' : `Turn ${state.turnLimit} reached: the highest score wins.`];
+  for (const p of state.players) lines.push(`${playerName(p.id)}${p.id === human ? ' (you)' : ''}: ${score(state, p.id)} points${p.alive ? '' : ' · eliminated'}`);
+  return { title, lines };
 }

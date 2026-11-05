@@ -1,7 +1,7 @@
 // The headless engine. The browser UI, the AI, the simulator and the MCP server all play through
 // these four functions: newGame, observe, legalActions and step. Pure and deterministic.
 import { cityAt, sameHex, tileAtHex, unitAt, unitById } from './board';
-import { income, levelFor, supportedUnits, territoryCity, unitCapacity } from './economy';
+import { income, levelFor, score, supportedUnits, territoryCity, unitCapacity } from './economy';
 import { previewAttack } from './combat';
 import { distance, neighbours } from './hex';
 import { generateMap } from './map';
@@ -322,6 +322,14 @@ function endTurn(state: GameState, player: number, events: GameEvent[]): void {
     if (state.players[next]?.alive) break;
   }
   state.current = next;
+  if (state.turn > state.turnLimit) {
+    // The last round is over: the highest score wins, a tie is a draw.
+    const ranked = state.players.map((p) => ({ id: p.id, score: score(state, p.id) })).sort((a, b) => b.score - a.score);
+    state.over = true;
+    state.winner = ranked[0] && ranked[0].score !== ranked[1]?.score ? ranked[0].id : null;
+    events.push({ type: 'game_over', winner: state.winner, reason: 'turn_limit' });
+    return;
+  }
   startTurn(state, events);
 }
 

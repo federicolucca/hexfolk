@@ -83,23 +83,25 @@ npm run atlas    # rebuild the tile atlas after changing assets/raw/tiles
 
 ## Roadmap
 
-v0.1 is built in milestones. Each one is playable, tested and committed:
+v0.1 is built in milestones. Each one was playable, tested and committed:
 
-1. **Plan:** architecture, data model and module list (`docs/PLAN.md`)
-2. **Map:** procedural map, rendering, pan and zoom
-3. **Units:** the four unit types and movement
-4. **Cities and economy:** stars, growth, levels, village capture
-5. **Techs and combat:** the tech tree and deterministic combat
-6. **AI:** greedy heuristic opponents
-7. **Release:** autosave, victory conditions, docs, GitHub Pages deploy
+1. **Plan:** architecture, data model and module list (`docs/PLAN.md`) ✅
+2. **Map:** procedural map, rendering, pan and zoom ✅
+3. **Units:** the four unit types and movement ✅
+4. **Cities and economy:** stars, growth, levels, village capture ✅
+5. **Techs and combat:** the six techs, walls and deterministic combat ✅
+6. **AI:** greedy heuristic opponents behind the `Agent` interface ✅
+7. **Release:** autosave, victory conditions, docs, GitHub Pages deploy ✅
+
+v0.1 is playable: 1 human against 1 to 3 AIs, ending by domination or the highest score on turn 30.
 
 After v0.1, possible additions include more tribes, a minimax AI, larger maps and more techs and
 units. None of these are planned yet.
 
 ## Contributing
 
-Contributions are welcome once the first milestone is published. Look for issues labelled
-`good first issue`. A `CONTRIBUTING.md` will describe the workflow. The short version: keep game
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and look for issues labelled
+`good first issue` (drafts in [docs/ISSUES.md](docs/ISSUES.md)). The short version: keep game
 logic in `src/core` with tests, and keep rendering free of rules.
 
 ## Art
