@@ -1,0 +1,34 @@
+/** A seeded pseudo-random number generator. Same seed, same sequence, on every platform. */
+export interface Rng {
+  /** A float in [0, 1). */
+  next(): number;
+  /** An integer in [min, max], both inclusive. */
+  int(min: number, max: number): number;
+  /** A random element of a non-empty array. */
+  pick<T>(items: readonly T[]): T;
+}
+
+/** Normalises any number to an unsigned 32-bit seed. */
+export function toSeed(seed: number): number {
+  return Math.trunc(seed) >>> 0;
+}
+
+/** mulberry32: a tiny, fast 32-bit generator, good enough for map generation. */
+export function createRng(seed: number): Rng {
+  let state = toSeed(seed);
+  const next = (): number => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  return {
+    next,
+    int: (min, max) => min + Math.floor(next() * (max - min + 1)),
+    pick: (items) => {
+      if (items.length === 0) throw new RangeError('pick() needs a non-empty array');
+      return items[Math.floor(next() * items.length)] as (typeof items)[number];
+    },
+  };
+}
