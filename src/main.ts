@@ -25,7 +25,7 @@ import { panelFor, techPanel } from './ui/panels';
 import { applyPalette, createHud } from './ui/hud';
 import { loadGame, saveGame } from './ui/save';
 import { Session } from './ui/session';
-import { parsePlayers, parseSeed, parseTheme, randomSeed, withParams } from './ui/url';
+import { parseDifficulty, parsePlayers, parseSeed, parseTheme, randomSeed, withParams } from './ui/url';
 
 const MAX_PIXEL_RATIO = 2;
 const HUMAN = 0;
@@ -55,6 +55,7 @@ async function start(app: HTMLElement): Promise<void> {
   const resume = saved && (urlSeed === undefined || urlSeed === saved.seed) ? saved : null;
   let seed = resume?.seed ?? urlSeed ?? randomSeed();
   let themeOverride = parseTheme(location.search);
+  let difficulty = parseDifficulty(location.search);
   let session = createSession(seed, resume);
   let theme: LoadedAtlas | null = null;
   let common: LoadedCommon | null = null;
@@ -69,7 +70,7 @@ async function start(app: HTMLElement): Promise<void> {
 
   function createSession(s: number, from: GameState | null = null): Session {
     const count = from?.players.length ?? players;
-    const agents = Object.fromEntries(Array.from({ length: count }, (_, i) => [i, new GreedyAgent()]));
+    const agents = Object.fromEntries(Array.from({ length: count }, (_, i) => [i, new GreedyAgent(difficulty)]));
     return new Session(from ?? newGame({ seed: s, players }), HUMAN, agents);
   }
 
@@ -159,7 +160,8 @@ async function start(app: HTMLElement): Promise<void> {
 
   const syncUrl = (): void => {
     hud.setSeed(seed);
-    history.replaceState(null, '', withParams(location.search, seed, themeOverride));
+    hud.setDifficulty(difficulty);
+    history.replaceState(null, '', withParams(location.search, seed, themeOverride, difficulty));
   };
 
   const fail = (err: unknown): void => {
@@ -168,8 +170,9 @@ async function start(app: HTMLElement): Promise<void> {
   };
 
   const hud = createHud(app, {
-    onNewGame: (typed) => {
+    onNewGame: (typed, chosen) => {
       seed = typed ?? randomSeed();
+      difficulty = chosen;
       session = createSession(seed);
       saveGame(store, session.state);
       syncUrl();

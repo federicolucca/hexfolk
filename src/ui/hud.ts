@@ -1,5 +1,6 @@
 // The HTML overlay: a top bar (seed, theme, new game, tools), a bottom dock (turn, stars, what is
 // selected, end turn) and a panel above the dock for choices (techs, city production).
+import { DEFAULT_DIFFICULTY, DIFFICULTIES, type Difficulty } from '../core/ai';
 import { THEMES, type Theme } from '../core/theme';
 import type { LoadedCommon } from '../render/atlasLoader';
 import { PALETTE } from '../render/palette';
@@ -18,6 +19,7 @@ export interface Card {
 
 export interface Hud {
   setSeed(seed: number): void;
+  setDifficulty(difficulty: Difficulty): void;
   /** The end screen with a New game button; null hides it. */
   setEnd(summary: { title: string; lines: string[] } | null): void;
   /** The override in the select (undefined = Auto) and the theme in use. */
@@ -38,7 +40,7 @@ export interface Hud {
 
 export interface HudActions {
   /** `seed` is what the player typed, or null for a random one. */
-  onNewGame(seed: number | null): void;
+  onNewGame(seed: number | null, difficulty: Difficulty): void;
   /** undefined means "Auto": the theme follows the seed. */
   onThemeChange(theme: Theme | undefined): void;
   onEndTurn(): void;
@@ -98,13 +100,19 @@ export function createHud(container: HTMLElement, actions: HudActions): Hud {
   auto.value = '';
   select.append(auto, ...THEMES.map((t) => Object.assign(element('option', '', capitalise(t)), { value: t })));
   select.addEventListener('change', () => actions.onThemeChange(THEMES.find((t) => t === select.value)));
+  const difficulty = element('select', 'hf-select');
+  difficulty.setAttribute('aria-label', 'AI difficulty');
+  difficulty.title = 'AI difficulty (applies to the next new game)';
+  difficulty.append(...DIFFICULTIES.map((d) => Object.assign(element('option', '', capitalise(d)), { value: d })));
+  difficulty.value = DEFAULT_DIFFICULTY;
   const newGame = element('button', 'hf-button hf-secondary', 'New game');
   newGame.type = 'button';
-  const requestNew = (): void => actions.onNewGame(/^\d{1,10}$/.test(seed.value.trim()) ? Number(seed.value.trim()) : null);
+  const requestNew = (): void =>
+    actions.onNewGame(/^\d{1,10}$/.test(seed.value.trim()) ? Number(seed.value.trim()) : null, DIFFICULTIES.find((d) => d === difficulty.value) ?? DEFAULT_DIFFICULTY);
   newGame.addEventListener('click', requestNew);
   const tools = element('span');
   tools.style.display = 'contents';
-  bar.append(element('span', 'hf-title', 'hexfolk'), seed, select, newGame, tools);
+  bar.append(element('span', 'hf-title', 'hexfolk'), seed, select, difficulty, newGame, tools);
 
   const dock = element('div', 'hf-dock');
   const status = element('div', 'hf-status');
@@ -131,6 +139,9 @@ export function createHud(container: HTMLElement, actions: HudActions): Hud {
   return {
     setSeed: (value) => {
       seed.value = String(value);
+    },
+    setDifficulty: (value) => {
+      difficulty.value = value;
     },
     setTheme: (override, effective) => {
       select.value = override ?? '';

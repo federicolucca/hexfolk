@@ -2,6 +2,15 @@
 
 Choices made where the brief changed or was ambiguous. Newest first.
 
+## 2026-11-05: AI difficulty
+
+- `GreedyAgent(difficulty)`: `normal` is the unchanged greedy AI. `easy` (the UI default) is the same agent with
+  two handicaps: it attacks only for a kill or at least twice the damage it takes, and it makes at most one
+  purchase (train, research, harvest, walls) per turn. A starting-stars handicap was not added: it would change
+  the engine's setup, and these two already make the AI clearly weaker. The agent still ends its turn properly.
+- The New game bar has a difficulty select (also `?difficulty=easy|normal`); it applies to the next new game and to
+  a resumed save's AI turns (difficulty is not stored in the save).
+
 ## 2026-11-05: Licences
 
 - Code stays MIT (`LICENSE`). The art in `assets/` and the generated `public/atlas` is CC BY 4.0,

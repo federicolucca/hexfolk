@@ -16,17 +16,38 @@ const MAX_STEPS = 80;
 /** An enemy this close to a city makes the unit on it stay put. */
 const THREAT_RANGE = 3;
 
+/**
+ * normal: the full greedy rules. easy: the same agent with handicaps, for human players: it attacks
+ * only when clearly favourable (a kill, or at least twice the damage it takes) and spends on at most
+ * EASY_PURCHASES_PER_TURN things per turn (training, research, harvest, walls).
+ */
+export type Difficulty = 'easy' | 'normal';
+export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal'];
+export const DEFAULT_DIFFICULTY: Difficulty = 'easy';
+export const EASY_PURCHASES_PER_TURN = 1;
+const PURCHASES: ReadonlySet<Action['type']> = new Set(['train', 'research', 'harvest', 'build_walls']);
+
+export const isDifficulty = (v: unknown): v is Difficulty => v === 'easy' || v === 'normal';
+
 export class GreedyAgent implements Agent {
-  readonly name = 'greedy';
+  readonly name: string;
+
+  constructor(readonly difficulty: Difficulty = 'normal') {
+    this.name = difficulty === 'normal' ? 'greedy' : `greedy-${difficulty}`;
+  }
 
   decide(observation: Observation, legal: Action[]): Action[] {
     const me = observation.you;
+    const easy = this.difficulty === 'easy';
     let state = observation.state;
     let options = legal;
+    let purchases = 0;
     const chosen: Action[] = [];
     for (let i = 0; i < MAX_STEPS; i++) {
-      const action = pick(state, me, options);
+      const usable = easy && purchases >= EASY_PURCHASES_PER_TURN ? options.filter((a) => !PURCHASES.has(a.type)) : options;
+      const action = pick(state, me, usable, easy);
       if (!action) break;
+      if (PURCHASES.has(action.type)) purchases++;
       chosen.push(action);
       state = step(state, me, [action]).state;
       options = legalActions(state, me);
@@ -36,10 +57,10 @@ export class GreedyAgent implements Agent {
   }
 }
 
-function pick(state: GameState, me: number, options: Action[]): Action | null {
+function pick(state: GameState, me: number, options: Action[], easy: boolean): Action | null {
   return (
     options.find((a) => a.type === 'capture') ??
-    bestAttack(state, options) ??
+    bestAttack(state, options, easy) ??
     trainIfThin(state, me, options) ??
     research(options) ??
     options.find((a) => a.type === 'harvest') ??
@@ -52,7 +73,7 @@ function pick(state: GameState, me: number, options: Action[]): Action | null {
 const cityOf = (state: GameState, id: number): City | undefined => state.cities.find((c) => c.id === id);
 
 /** Attacks that are favourable: a kill, or more damage dealt than taken. */
-function bestAttack(state: GameState, options: Action[]): Action | null {
+function bestAttack(state: GameState, options: Action[], easy: boolean): Action | null {
   let best: Action | null = null;
   let bestScore = 0;
   for (const a of options) {
@@ -62,6 +83,7 @@ function bestAttack(state: GameState, options: Action[]): Action | null {
     if (!attacker || !target) continue;
     const p = previewAttack(state, attacker, target);
     if (p.attackerDies && !p.kills) continue;
+    if (easy && !p.kills && p.damage < 2 * p.counter) continue;
     const score = p.damage - p.counter + (p.kills ? 10 : 0);
     if (score > bestScore) {
       best = a;
