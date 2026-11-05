@@ -1,4 +1,5 @@
 // Static rule tables: unit stats, techs and tunable numbers. Plain data, no logic.
+import type { Resource } from './map';
 
 export type UnitType = 'warrior' | 'archer' | 'rider' | 'defender';
 export type TechId = 'hunting' | 'fishing' | 'riding' | 'climbing' | 'archery' | 'fortification';
@@ -28,3 +29,25 @@ export const UNIT_STATS: Readonly<Record<UnitType, UnitStats>> = {
 
 /** Players: 2 to 4. Player 0 is the human in the browser; the others are agents. */
 export const DEFAULT_TURN_LIMIT = 30;
+
+/** Stars before the first turn's income (a capital earns 2, so everyone starts their turn on 5). */
+export const STARTING_STARS = 3;
+
+/** Stars per turn: every city earns its base plus its population; a capital earns 1 more. */
+export const CITY_BASE_INCOME = 1;
+export const CAPITAL_BONUS_INCOME = 1;
+
+/** Harvesting a resource next to one of your cities costs this and adds 1 population. */
+export const HARVEST_COST = 2;
+export const RESOURCE_TECH: Readonly<Record<Resource, TechId | null>> = {
+  fruit: null,
+  game: 'hunting',
+  fish: 'fishing',
+  ore: 'climbing',
+};
+
+/** Total population needed for each city level (index 0 = level 1). */
+export const LEVEL_POPULATION: readonly number[] = [0, 2, 5];
+export const MAX_LEVEL = LEVEL_POPULATION.length;
+/** A city supports up to level + this many units (its "home" units). */
+export const UNITS_PER_LEVEL_BONUS = 1;

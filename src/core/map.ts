@@ -2,11 +2,21 @@ import { axialToOffset, distance, type Hex, neighbours, offsetToAxial } from './
 import { createRng, type Rng, toSeed } from './rng';
 
 export type Terrain = 'grass' | 'forest' | 'mountain' | 'water';
+/** Harvestable resources; each lives on one terrain (fruit on grass, game in forest...). */
+export type Resource = 'fruit' | 'game' | 'fish' | 'ore';
+
+export const RESOURCE_TERRAIN: Readonly<Record<Resource, Terrain>> = {
+  fruit: 'grass',
+  game: 'forest',
+  fish: 'water',
+  ore: 'mountain',
+};
 
 export interface Tile {
   q: number;
   r: number;
   terrain: Terrain;
+  resource: Resource | null;
 }
 
 export type CityKind = 'capital' | 'village';
@@ -62,7 +72,8 @@ export function isLand(terrain: Terrain): boolean {
 /**
  * Generates an 11x11 island from a seed. The same seed and player count always give the same map.
  * Capitals sit on grass, at least MIN_CAPITAL_DISTANCE apart, and can reach each other over
- * grass and forest. Neutral villages sit on grass, away from every other city.
+ * grass and forest. Neutral villages sit on grass, away from every other city. Resources (fruit,
+ * game, fish, ore) are scattered last.
  */
 export function generateMap(seed: number, playerCount: number): GameMap {
   if (!Number.isInteger(playerCount) || playerCount < MIN_PLAYERS || playerCount > MAX_PLAYERS) {
@@ -83,7 +94,7 @@ function tryGenerate(rng: Rng, seed: number, playerCount: number): GameMap | und
   const tiles: Tile[] = [];
   for (let row = 0; row < height; row++) {
     for (let col = 0; col < width; col++) {
-      tiles.push({ ...offsetToAxial(col, row), terrain: 'water' });
+      tiles.push({ ...offsetToAxial(col, row), terrain: 'water', resource: null });
     }
   }
   const map: GameMap = { seed, width, height, playerCount, tiles, cities: [] };
@@ -101,7 +112,47 @@ function tryGenerate(rng: Rng, seed: number, playerCount: number): GameMap | und
     setTerrain(map, hex, 'grass');
     map.cities.push({ q: hex.q, r: hex.r, kind: 'village', owner: null });
   }
+  placeResources(map, rng);
   return map;
+}
+
+/** Chance that a tile of each terrain holds its resource (water only next to land). */
+const RESOURCE_CHANCE: Readonly<Record<Terrain, number>> = { grass: 0.18, forest: 0.3, mountain: 0.35, water: 0.3 };
+const TERRAIN_RESOURCE: Readonly<Record<Terrain, Resource>> = { grass: 'fruit', forest: 'game', mountain: 'ore', water: 'fish' };
+/** Every capital gets at least this many resources on its six neighbours, when the terrain allows. */
+const CAPITAL_RESOURCES = 2;
+
+/**
+ * Scatters resources over tiles without a city, then tops up each capital's ring so no player
+ * starts without anything to harvest. Runs last, so it never changes the terrain or the cities.
+ */
+function placeResources(map: GameMap, rng: Rng): void {
+  const cityHexes = new Set(map.cities.map((c) => `${c.q},${c.r}`));
+  const free = (t: Tile): boolean => !cityHexes.has(`${t.q},${t.r}`);
+  const coastal = (t: Tile): boolean =>
+    neighbours(t).some((n) => {
+      const other = tileAt(map, n);
+      return other !== undefined && isLand(other.terrain);
+    });
+  for (const tile of map.tiles) {
+    if (!free(tile) || (tile.terrain === 'water' && !coastal(tile))) continue;
+    if (rng.next() < RESOURCE_CHANCE[tile.terrain]) tile.resource = TERRAIN_RESOURCE[tile.terrain];
+  }
+  for (const city of map.cities) {
+    if (city.kind !== 'capital') continue;
+    const ring = neighbours(city).flatMap((n) => {
+      const t = tileAt(map, n);
+      return t && free(t) && (t.terrain !== 'water' || coastal(t)) ? [t] : [];
+    });
+    let have = ring.filter((t) => t.resource !== null).length;
+    for (const t of ring) {
+      if (have >= CAPITAL_RESOURCES) break;
+      if (t.resource === null) {
+        t.resource = TERRAIN_RESOURCE[t.terrain];
+        have++;
+      }
+    }
+  }
 }
 
 /** Land is the top LAND_SHARE of tiles by (closeness to the centre + smoothed noise). */

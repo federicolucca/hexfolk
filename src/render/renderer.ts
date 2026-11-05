@@ -33,6 +33,8 @@ export const HD_THRESHOLD = 1.15;
 /** Units are drawn at this scale of their 96 px atlas box, standing a little below the hex centre. */
 const UNIT_SCALE = 0.8;
 const UNIT_FOOT_OFFSET = 26;
+/** Resource overlays (56 px atlas box), a little left of centre so a unit can stand beside them. */
+const RESOURCE_SCALE = 0.85;
 
 export function wantsHd(camera: Camera, pixelRatio: number): boolean {
   return camera.zoom * pixelRatio > HD_THRESHOLD;
@@ -86,7 +88,10 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: Scene): void {
       const city = cities.get(key(tile));
       const name = frameName(theme.atlas, game.seed, tile, city);
       const frame = name ? theme.atlas.frames[name] : undefined;
-      if (frame) drawFrame(ctx, theme, hd, frame, hexToPixel(tile, metrics));
+      const centre = hexToPixel(tile, metrics);
+      if (frame) drawFrame(ctx, theme, hd, frame, centre);
+      const overlay = tile.resource && !city ? common.atlas.frames[`overlays/${tile.resource}`] : undefined;
+      if (overlay) drawFrame(ctx, common, hd, overlay, { x: centre.x - 20, y: centre.y + 4 }, RESOURCE_SCALE);
     }
     for (const tile of tiles) {
       const city = cities.get(key(tile));

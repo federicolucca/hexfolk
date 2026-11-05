@@ -1,5 +1,6 @@
 // Wires the engine, the canvas renderer and the HUD together. Game rules live in src/core only.
 import { passAgent } from './core/agent';
+import { income } from './core/economy';
 import { newGame } from './core/engine';
 import type { HexRef } from './core/state';
 import { type Theme, themeFromSeed } from './core/theme';
@@ -19,7 +20,8 @@ import {
 import { attachInput } from './render/input';
 import { type Bounds, hexToPixel, mapBounds, pixelToHex } from './render/layout';
 import { drawScene, wantsHd } from './render/renderer';
-import { describeHex, playerName, turnLine } from './ui/describe';
+import { describeHex, playerName, starsLine, turnLine } from './ui/describe';
+import { panelFor } from './ui/panels';
 import { applyPalette, createHud } from './ui/hud';
 import { Session } from './ui/session';
 import { parsePlayers, parseSeed, parseTheme, randomSeed, withParams } from './ui/url';
@@ -79,10 +81,26 @@ async function start(app: HTMLElement): Promise<void> {
   /** Refreshes every HUD element from the session. */
   const refresh = (): void => {
     const state = session.state;
-    hud.setStatus(turnLine(state), `${playerName(state.current)} to play`);
+    hud.setStatus(turnLine(state), starsLine(state, HUMAN, income(state, HUMAN)));
     const info = session.selectedHex ? describeHex(state, session.selectedHex) : null;
-    hud.setInfo(info?.title ?? (session.humanToMove ? 'Your turn' : 'Waiting…'), info?.detail ?? (session.humanToMove ? 'Tap a unit, then a tile' : ''));
+    const waiting = `${playerName(state.current)} is playing…`;
+    hud.setInfo(info?.title ?? (session.humanToMove ? 'Your turn' : waiting), info?.detail ?? (session.humanToMove ? 'Tap a unit or a city' : ''));
     hud.setEndTurn(session.humanToMove && !busy);
+    const panel = session.selectedHex && !busy ? panelFor(state, HUMAN, session.selectedHex) : null;
+    hud.setPanel(
+      panel?.title ?? null,
+      panel?.cards.map((c) => ({
+        ...(c.icon ? { icon: c.icon } : {}),
+        label: c.label,
+        detail: c.detail,
+        enabled: c.action !== undefined,
+        onClick: () => {
+          if (!c.action || busy) return;
+          session.act(c.action);
+          refresh();
+        },
+      })),
+    );
     requestDraw();
   };
 

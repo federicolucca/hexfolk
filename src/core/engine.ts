@@ -1,10 +1,12 @@
 // The headless engine. The browser UI, the AI, the simulator and the MCP server all play through
 // these four functions: newGame, observe, legalActions and step. Pure and deterministic.
-import { sameHex, unitById } from './board';
+import { cityAt, sameHex, tileAtHex, unitById } from './board';
+import { income, levelFor, supportedUnits, territoryCity, unitCapacity } from './economy';
+import { neighbours } from './hex';
 import { generateMap } from './map';
 import { reachable } from './movement';
-import { DEFAULT_TURN_LIMIT, UNIT_STATS } from './rules';
-import type { Action, GameEvent, GameState, Rejection, StepResult } from './state';
+import { DEFAULT_TURN_LIMIT, HARVEST_COST, RESOURCE_TECH, STARTING_STARS, UNIT_STATS, UNIT_TYPES } from './rules';
+import type { Action, GameEvent, GameState, Player, Rejection, StepResult } from './state';
 
 export interface NewGameOptions {
   seed: number;
@@ -12,8 +14,6 @@ export interface NewGameOptions {
   players: number;
   turnLimit?: number;
 }
-
-export const STARTING_STARS = 5;
 
 export function newGame({ seed, players, turnLimit = DEFAULT_TURN_LIMIT }: NewGameOptions): GameState {
   if (!Number.isInteger(turnLimit) || turnLimit < 1) throw new RangeError('turnLimit must be a positive integer');
@@ -45,20 +45,9 @@ export function newGame({ seed, players, turnLimit = DEFAULT_TURN_LIMIT }: NewGa
   };
   // Every player starts with a warrior on their capital.
   for (const city of state.cities) {
-    if (city.capital && city.owner !== null) {
-      state.units.push({
-        id: state.nextUnitId++,
-        type: 'warrior',
-        owner: city.owner,
-        q: city.q,
-        r: city.r,
-        hp: UNIT_STATS.warrior.health,
-        moved: false,
-        attacked: false,
-        home: city.id,
-      });
-    }
+    if (city.capital && city.owner !== null) addUnit(state, 'warrior', city.owner, city, city.id, false);
   }
+  startTurn(state, []);
   return state;
 }
 
@@ -72,10 +61,14 @@ export function observe(state: GameState, player: number): Observation {
   return { you: player, state: structuredClone(state) };
 }
 
+const hasTech = (player: Player | undefined, tech: string | null): boolean =>
+  tech === null || (player?.techs as string[] | undefined)?.includes(tech) === true;
+
 /** Why the action is illegal for this player right now, or null when it is legal. */
 export function checkAction(state: GameState, player: number, action: Action): string | null {
   if (state.over) return 'the game is over';
   if (player !== state.current) return `it is player ${state.current}'s turn`;
+  const me = state.players[player];
   switch (action.type) {
     case 'end_turn':
       return null;
@@ -84,6 +77,35 @@ export function checkAction(state: GameState, player: number, action: Action): s
       if (!unit || unit.owner !== player) return 'no such unit of yours';
       if (unit.moved || unit.attacked) return 'this unit has already moved';
       if (!reachable(state, unit).some((h) => sameHex(h, action.to))) return 'that hex is out of reach';
+      return null;
+    }
+    case 'capture': {
+      const unit = unitById(state, action.unit);
+      if (!unit || unit.owner !== player) return 'no such unit of yours';
+      const city = cityAt(state, unit);
+      if (!city) return 'there is no city here';
+      if (city.owner === player) return 'this city is already yours';
+      if (unit.moved || unit.attacked) return 'a unit must start its turn on a city to capture it';
+      return null;
+    }
+    case 'train': {
+      const city = state.cities.find((c) => c.id === action.city);
+      if (!city || city.owner !== player) return 'no such city of yours';
+      const stats = UNIT_STATS[action.unit];
+      if (!stats) return 'unknown unit type';
+      if (!hasTech(me, stats.tech)) return `${action.unit}s need ${stats.tech}`;
+      if (state.units.some((u) => sameHex(u, city))) return 'the city tile is occupied';
+      if (supportedUnits(state, city) >= unitCapacity(city)) return 'the city supports no more units';
+      if ((me?.stars ?? 0) < stats.cost) return `needs ${stats.cost} stars`;
+      return null;
+    }
+    case 'harvest': {
+      const tile = tileAtHex(state, action.at);
+      if (!tile?.resource) return 'no resource there';
+      if (!territoryCity(state, player, action.at)) return 'not next to one of your cities';
+      const tech = RESOURCE_TECH[tile.resource];
+      if (!hasTech(me, tech)) return `harvesting ${tile.resource} needs ${tech}`;
+      if ((me?.stars ?? 0) < HARVEST_COST) return `needs ${HARVEST_COST} stars`;
       return null;
     }
     default:
@@ -95,9 +117,24 @@ export function checkAction(state: GameState, player: number, action: Action): s
 export function legalActions(state: GameState, player: number): Action[] {
   if (state.over || player !== state.current) return [];
   const actions: Action[] = [];
+  const legal = (a: Action): void => {
+    if (checkAction(state, player, a) === null) actions.push(a);
+  };
   for (const unit of state.units) {
     if (unit.owner !== player) continue;
     for (const to of reachable(state, unit)) actions.push({ type: 'move', unit: unit.id, to });
+    legal({ type: 'capture', unit: unit.id });
+  }
+  const harvestable = new Set<string>();
+  for (const city of state.cities) {
+    if (city.owner !== player) continue;
+    for (const unit of UNIT_TYPES) legal({ type: 'train', city: city.id, unit });
+    for (const hex of [city, ...neighbours(city)]) {
+      const key = `${hex.q},${hex.r}`;
+      if (harvestable.has(key)) continue;
+      harvestable.add(key);
+      legal({ type: 'harvest', at: { q: hex.q, r: hex.r } });
+    }
   }
   actions.push({ type: 'end_turn' });
   return actions;
@@ -123,7 +160,24 @@ export function step(state: GameState, player: number, actions: readonly Action[
   return { state: next, events, rejected };
 }
 
+function addUnit(state: GameState, type: (typeof UNIT_TYPES)[number], owner: number, at: { q: number; r: number }, home: number | null, ready: boolean) {
+  const unit = {
+    id: state.nextUnitId++,
+    type,
+    owner,
+    q: at.q,
+    r: at.r,
+    hp: UNIT_STATS[type].health,
+    moved: !ready,
+    attacked: !ready,
+    home,
+  };
+  state.units.push(unit);
+  return unit;
+}
+
 function apply(state: GameState, player: number, action: Action, events: GameEvent[]): void {
+  const me = state.players[player];
   switch (action.type) {
     case 'move': {
       const unit = unitById(state, action.unit);
@@ -132,12 +186,75 @@ function apply(state: GameState, player: number, action: Action, events: GameEve
       unit.q = action.to.q;
       unit.r = action.to.r;
       unit.moved = true;
-      events.push({ type: 'moved', unit: unit.id, from, to: { ...action.to } });
+      events.push({ type: 'moved', unit: unit.id, from, to: { q: action.to.q, r: action.to.r } });
+      return;
+    }
+    case 'capture': {
+      const unit = unitById(state, action.unit);
+      const city = unit && cityAt(state, unit);
+      if (!unit || !city) return;
+      const from = city.owner;
+      const wasCapital = city.capital;
+      city.owner = player;
+      city.capital = false;
+      unit.moved = true;
+      unit.attacked = true;
+      for (const u of state.units) if (u.home === city.id && u.owner !== player) u.home = null;
+      events.push({ type: 'captured', unit: unit.id, city: city.id, from });
+      if (wasCapital && from !== null) eliminate(state, from, player, events);
+      return;
+    }
+    case 'train': {
+      const city = state.cities.find((c) => c.id === action.city);
+      if (!city || !me) return;
+      me.stars -= UNIT_STATS[action.unit].cost;
+      const unit = addUnit(state, action.unit, player, city, city.id, false);
+      events.push({ type: 'trained', unit: unit.id, city: city.id, unitType: action.unit });
+      return;
+    }
+    case 'harvest': {
+      const tile = tileAtHex(state, action.at);
+      const city = territoryCity(state, player, action.at);
+      if (!tile?.resource || !city || !me) return;
+      me.stars -= HARVEST_COST;
+      events.push({ type: 'harvested', at: { q: action.at.q, r: action.at.r }, resource: tile.resource, city: city.id });
+      tile.resource = null;
+      city.population++;
+      const level = levelFor(city.population);
+      if (level > city.level) {
+        city.level = level;
+        events.push({ type: 'city_grew', city: city.id, level });
+      }
       return;
     }
     case 'end_turn':
       endTurn(state, player, events);
       return;
+  }
+}
+
+/** Losing your capital knocks you out: your units go, your other cities turn neutral. */
+function eliminate(state: GameState, loser: number, by: number, events: GameEvent[]): void {
+  const player = state.players[loser];
+  if (!player || !player.alive) return;
+  player.alive = false;
+  state.units = state.units.filter((u) => u.owner !== loser);
+  for (const city of state.cities) {
+    if (city.owner === loser) {
+      city.owner = null;
+      city.capital = false;
+    }
+  }
+  for (const u of state.units) {
+    const home = u.home === null ? undefined : state.cities.find((c) => c.id === u.home);
+    if (home && home.owner !== u.owner) u.home = null;
+  }
+  events.push({ type: 'eliminated', player: loser, by });
+  const alive = state.players.filter((p) => p.alive);
+  if (alive.length === 1) {
+    state.over = true;
+    state.winner = alive[0]?.id ?? null;
+    events.push({ type: 'game_over', winner: state.winner, reason: 'domination' });
   }
 }
 
@@ -154,7 +271,9 @@ function endTurn(state: GameState, player: number, events: GameEvent[]): void {
   startTurn(state, events);
 }
 
+/** Start of a player's turn: their units are refreshed and their cities pay out. */
 function startTurn(state: GameState, events: GameEvent[]): void {
+  const player = state.players[state.current];
   for (const unit of state.units) {
     if (unit.owner === state.current) {
       unit.moved = false;
@@ -162,4 +281,9 @@ function startTurn(state: GameState, events: GameEvent[]): void {
     }
   }
   events.push({ type: 'turn_started', player: state.current, turn: state.turn });
+  if (player) {
+    const stars = income(state, player.id);
+    player.stars += stars;
+    events.push({ type: 'income', player: player.id, stars });
+  }
 }

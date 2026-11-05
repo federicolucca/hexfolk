@@ -40,3 +40,9 @@ export function describeHex(state: GameState, hex: HexRef): { title: string; det
 export function turnLine(state: GameState): string {
   return `Turn ${Math.min(state.turn, state.turnLimit)}/${state.turnLimit}`;
 }
+
+/** The dock's second line for the human: stars and income, or whose turn it is. */
+export function starsLine(state: GameState, player: number, perTurn: number): string {
+  const stars = state.players[player]?.stars ?? 0;
+  return `★ ${stars} (+${perTurn}/turn)`;
+}

@@ -7,6 +7,7 @@ import {
   MAP_SIZE,
   MIN_CAPITAL_DISTANCE,
   MIN_VILLAGE_DISTANCE,
+  RESOURCE_TERRAIN,
   tileAt,
   tileIndex,
 } from '../src/core/map';
@@ -136,5 +137,36 @@ describe('generateMap', () => {
       }
       expect(seen.size).toBe(land.length);
     });
+  });
+});
+
+describe('resources', () => {
+  it('sit only on their terrain, never on a city, and fish only next to land', () => {
+    forEachMap((map) => {
+      const cities = new Set(map.cities.map((c) => `${c.q},${c.r}`));
+      for (const t of map.tiles) {
+        if (t.resource === null) continue;
+        expect(RESOURCE_TERRAIN[t.resource]).toBe(t.terrain);
+        expect(cities.has(`${t.q},${t.r}`)).toBe(false);
+        if (t.resource === 'fish') expect(neighbours(t).some((n) => isLand(tileAt(map, n)?.terrain ?? 'water'))).toBe(true);
+      }
+    });
+  });
+
+  it('give every capital at least two resources next to it (or all it can have)', () => {
+    forEachMap((map) => {
+      for (const c of map.cities.filter((x) => x.kind === 'capital')) {
+        const ring = neighbours(c).map((n) => tileAt(map, n)).filter((t) => t !== undefined);
+        const count = ring.filter((t) => t.resource !== null).length;
+        expect(count).toBeGreaterThanOrEqual(Math.min(2, ring.length));
+      }
+    });
+  });
+
+  it('are plentiful but not everywhere', () => {
+    const map = generateMap(12345, 4);
+    const n = map.tiles.filter((t) => t.resource !== null).length;
+    expect(n).toBeGreaterThan(10);
+    expect(n).toBeLessThan(50);
   });
 });

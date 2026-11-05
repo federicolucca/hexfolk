@@ -10,7 +10,7 @@ export function blankGame(players = 2): GameState {
   const state = newGame({ seed: 1, players });
   for (const t of state.tiles) {
     t.terrain = 'grass';
-    if ('resource' in t) (t as { resource: unknown }).resource = null;
+    t.resource = null;
   }
   state.units = [];
   return state;

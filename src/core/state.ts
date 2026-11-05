@@ -1,5 +1,5 @@
 // The game state, actions and events. Everything is plain JSON: save it with JSON.stringify.
-import type { Tile } from './map';
+import type { Resource, Tile } from './map';
 import type { TechId, UnitType } from './rules';
 
 export interface Player {
@@ -66,10 +66,20 @@ export interface HexRef {
 
 export type Action =
   | { type: 'move'; unit: number; to: HexRef }
+  | { type: 'capture'; unit: number }
+  | { type: 'train'; city: number; unit: UnitType }
+  | { type: 'harvest'; at: HexRef }
   | { type: 'end_turn' };
 
 export type GameEvent =
   | { type: 'moved'; unit: number; from: HexRef; to: HexRef }
+  | { type: 'captured'; unit: number; city: number; from: number | null }
+  | { type: 'trained'; unit: number; city: number; unitType: UnitType }
+  | { type: 'harvested'; at: HexRef; resource: Resource; city: number }
+  | { type: 'city_grew'; city: number; level: number }
+  | { type: 'income'; player: number; stars: number }
+  | { type: 'eliminated'; player: number; by: number }
+  | { type: 'game_over'; winner: number | null; reason: 'domination' | 'turn_limit' }
   | { type: 'turn_ended'; player: number }
   | { type: 'turn_started'; player: number; turn: number };
 
