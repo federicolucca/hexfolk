@@ -2,6 +2,40 @@
 
 Choices made where the brief changed or was ambiguous. Newest first.
 
+## 2026-11-05: Sprite pre-rendering (camera, lighting, model mapping)
+
+- **Tool:** `npm run sprites` (`scripts/render-sprites.mjs`) serves the glTF sources and three.js to
+  headless Chromium through `playwright-core` (pinned to 1.64.1, which matches the Chromium build
+  already in `~/.cache/ms-playwright`; set `CHROME_PATH` to use another Chrome). WebGL runs on
+  SwiftShader, so no GPU is needed. All 13 sprites render in about 4 seconds.
+- **Camera:** one orthographic camera for every sprite, looking north from 40 degrees above the
+  horizon. KayKit hexes have their corners on the z axis, so they are pointy-top on screen with no
+  rotation. 128 px per world unit: a tile is 256 px wide, rows are 142.51 px apart and the top
+  face is 190 px tall (all in `manifest.json` under `tile`).
+- **Render:** 2x supersampled, then downscaled. Transparent background. Tile side walls are clipped
+  0.4 units below the grass surface, so tiles read as thin slabs. Empty rows are trimmed from the
+  top only, so every sprite is 256 px wide and its `anchor` (the centre of the hex's top face)
+  stays at x = 128.
+- **Lighting:** white hemisphere light (intensity 1.35) plus a white sun (2.0) from the upper left
+  and slightly in front, with soft PCF shadows. No tone mapping, sRGB output.
+- **Model mapping:**
+
+  | Sprite | KayKit models |
+  | --- | --- |
+  | `terrain-grass` | `tiles/base/hex_grass` |
+  | `terrain-forest` | `hex_grass` + `decoration/nature/trees_A_large` |
+  | `terrain-mountain` | `hex_grass` + `decoration/nature/mountain_B` |
+  | `terrain-water` | `tiles/base/hex_water` |
+  | `capital-{blue,red,yellow,green}` | `hex_grass` + `building_castle_{colour}` at 0.62 scale |
+  | `village-{blue,red,yellow,green}` | `hex_grass` + `building_home_A`, `building_home_B` (0.7) and `building_well` (0.6) in that colour |
+  | `village-neutral` | the blue village with its team-colour UV cells remapped to neutral swatches |
+
+- **Neutral village:** the pack has no neutral houses (the neutral folder holds walls, ruins and
+  construction stages, and the tents read as market stalls). The blue houses are reused with the
+  two team-colour cells of the 8x4 colour atlas remapped to neutral swatches, so the neutral village
+  looks like the player villages without a team colour.
+- **Grass colour:** kept as the pack's own lime swatch; only the light intensity was tuned.
+
 ## 2026-11-05: Map generation
 
 - **Coordinates:** axial (q, r) for pointy-top hexes. The 11x11 rectangle uses "odd-r" offset rows

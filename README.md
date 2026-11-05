@@ -77,6 +77,7 @@ npm install
 npm run dev      # start the dev server
 npm test         # run the tests
 npm run build    # build for production
+npm run sprites  # re-render public/sprites/ (needs ./scripts/fetch-assets.sh first)
 ```
 
 ## Roadmap
