@@ -1,9 +1,10 @@
-// Wires the pure map generator, the canvas renderer and the HUD together.
-import type { Hex } from './core/hex';
-import { type GameMap, generateMap, tileAt } from './core/map';
+// Wires the engine, the canvas renderer and the HUD together. Game rules live in src/core only.
+import { passAgent } from './core/agent';
+import { newGame } from './core/engine';
+import type { HexRef } from './core/state';
 import { type Theme, themeFromSeed } from './core/theme';
 import { frameExtents } from './render/atlas';
-import { AtlasLoader, type LoadedAtlas } from './render/atlasLoader';
+import { AtlasLoader, type LoadedAtlas, type LoadedCommon } from './render/atlasLoader';
 import {
   type Camera,
   clampCamera,
@@ -11,18 +12,20 @@ import {
   panBy,
   screenToWorld,
   type Viewport,
+  worldToScreen,
   zoomAt,
   zoomLimits,
 } from './render/camera';
 import { attachInput } from './render/input';
-import { type Bounds, mapBounds, pixelToHex } from './render/layout';
+import { type Bounds, hexToPixel, mapBounds, pixelToHex } from './render/layout';
 import { drawScene, wantsHd } from './render/renderer';
-import { describeTile } from './ui/describe';
+import { describeHex, playerName, turnLine } from './ui/describe';
 import { applyPalette, createHud } from './ui/hud';
-import { createLegend } from './ui/legend';
+import { Session } from './ui/session';
 import { parsePlayers, parseSeed, parseTheme, randomSeed, withParams } from './ui/url';
 
 const MAX_PIXEL_RATIO = 2;
+const HUMAN = 0;
 
 async function start(app: HTMLElement): Promise<void> {
   applyPalette(document.documentElement);
@@ -33,35 +36,55 @@ async function start(app: HTMLElement): Promise<void> {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D is not available');
 
-  const loader = new AtlasLoader(`${import.meta.env.BASE_URL}atlas/`);
+  const atlasBase = `${import.meta.env.BASE_URL}atlas/`;
+  const loader = new AtlasLoader(atlasBase);
   const players = parsePlayers(location.search);
   let seed = parseSeed(location.search) ?? randomSeed();
   let themeOverride = parseTheme(location.search);
-  let map: GameMap = generateMap(seed, players);
-  let atlas: LoadedAtlas | null = null;
+  let session = createSession(seed);
+  let theme: LoadedAtlas | null = null;
+  let common: LoadedCommon | null = null;
   let bounds: Bounds | null = null;
   let viewport: Viewport = { width: 1, height: 1 };
   let pixelRatio = 1;
   let camera: Camera = { x: 0, y: 0, zoom: 1 };
-  let selected: Hex | null = null;
   let frame = 0;
   let loadToken = 0;
+  let busy = false;
 
-  const theme = (): Theme => themeOverride ?? themeFromSeed(seed);
+  function createSession(s: number): Session {
+    const agents = Object.fromEntries(Array.from({ length: players }, (_, i) => [i, passAgent]));
+    return new Session(newGame({ seed: s, players }), HUMAN, agents);
+  }
+
+  const themeName = (): Theme => themeOverride ?? themeFromSeed(seed);
 
   const draw = (): void => {
-    if (!atlas) return;
-    if (wantsHd(camera, pixelRatio)) loader.requestHd(atlas.atlas.theme as Theme, atlas, requestDraw);
-    drawScene(ctx, { map, atlas, camera, viewport, pixelRatio, selected });
+    if (!theme || !common) return;
+    if (wantsHd(camera, pixelRatio)) {
+      loader.requestHd(theme, requestDraw);
+      loader.requestHd(common, requestDraw);
+    }
+    drawScene(ctx, { game: session.state, theme, common, camera, viewport, pixelRatio, highlights: session.highlights() });
   };
 
   function requestDraw(): void {
-    if (frame || !atlas) return;
+    if (frame || !theme) return;
     frame = requestAnimationFrame(() => {
       frame = 0;
       draw();
     });
   }
+
+  /** Refreshes every HUD element from the session. */
+  const refresh = (): void => {
+    const state = session.state;
+    hud.setStatus(turnLine(state), `${playerName(state.current)} to play`);
+    const info = session.selectedHex ? describeHex(state, session.selectedHex) : null;
+    hud.setInfo(info?.title ?? (session.humanToMove ? 'Your turn' : 'Waiting…'), info?.detail ?? (session.humanToMove ? 'Tap a unit, then a tile' : ''));
+    hud.setEndTurn(session.humanToMove && !busy);
+    requestDraw();
+  };
 
   const setCamera = (next: Camera): void => {
     camera = bounds ? clampCamera(next, bounds, zoomLimits(bounds, viewport)) : next;
@@ -69,23 +92,24 @@ async function start(app: HTMLElement): Promise<void> {
   };
 
   const updateBounds = (refit: boolean): void => {
-    if (!atlas) return;
-    const { above, below } = frameExtents(atlas.atlas);
-    bounds = mapBounds(map.tiles, atlas.atlas.tile, above, below);
+    if (!theme) return;
+    const { above, below } = frameExtents(theme.atlas);
+    bounds = mapBounds(session.state.tiles, theme.atlas.tile, above, below);
     camera = refit ? fitCamera(bounds, viewport) : clampCamera(camera, bounds, zoomLimits(bounds, viewport));
   };
 
   /** Loads the current theme's atlas (if needed) and redraws. Older requests lose the race. */
   const showTheme = async (refit: boolean): Promise<void> => {
     const token = ++loadToken;
-    hud.setTheme(themeOverride, theme());
-    legend.setTheme(theme());
-    const loaded = await loader.load(theme());
+    hud.setTheme(themeOverride, themeName());
+    const [loaded, loadedCommon] = await Promise.all([loader.load(themeName()), loader.loadCommon()]);
     if (token !== loadToken) return;
-    atlas = loaded;
+    theme = loaded;
+    common = loadedCommon;
+    hud.setCommonAtlas(common, atlasBase);
     updateBounds(refit);
     hud.setMessage(null);
-    requestDraw();
+    refresh();
   };
 
   const syncUrl = (): void => {
@@ -95,15 +119,13 @@ async function start(app: HTMLElement): Promise<void> {
 
   const fail = (err: unknown): void => {
     console.error(err);
-    hud.setMessage(`Could not load the tiles: ${err instanceof Error ? err.message : String(err)}`);
+    hud.setMessage(`Something went wrong: ${err instanceof Error ? err.message : String(err)}`);
   };
 
   const hud = createHud(app, {
-    onNewMap: () => {
+    onNewGame: () => {
       seed = randomSeed();
-      map = generateMap(seed, players);
-      selected = null;
-      hud.setSelection(null);
+      session = createSession(seed);
       syncUrl();
       showTheme(true).catch(fail);
     },
@@ -112,9 +134,20 @@ async function start(app: HTMLElement): Promise<void> {
       syncUrl();
       showTheme(false).catch(fail);
     },
+    onEndTurn: () => {
+      if (busy || !session.humanToMove) return;
+      busy = true;
+      refresh();
+      session
+        .endTurn(() => refresh())
+        .catch(fail)
+        .finally(() => {
+          busy = false;
+          refresh();
+        });
+    },
   });
   hud.setMessage('Loading…');
-  const legend = createLegend(app, `${import.meta.env.BASE_URL}atlas/`);
 
   const resize = (): void => {
     const rect = canvas.getBoundingClientRect();
@@ -132,20 +165,30 @@ async function start(app: HTMLElement): Promise<void> {
   new ResizeObserver(resize).observe(canvas);
   await showTheme(true);
 
+  const onTap = (hex: HexRef): void => {
+    if (busy) return;
+    session.tap(hex);
+    refresh();
+  };
+
+  // ?debug exposes read-only helpers for browser tests (where a hex is on screen, the state).
+  if (new URLSearchParams(location.search).has('debug')) {
+    Object.assign(window, {
+      hexfolkDebug: {
+        state: () => session.state,
+        hexToScreen: (hex: HexRef) => (theme ? worldToScreen(camera, viewport, hexToPixel(hex, theme.atlas.tile)) : null),
+      },
+    });
+  }
+
   attachInput(canvas, {
     onPan: (dx, dy) => setCamera(panBy(camera, dx, dy)),
     onZoom: (factor, at) => {
       if (bounds) setCamera(zoomAt(camera, viewport, at, factor, zoomLimits(bounds, viewport)));
     },
     onTap: (at) => {
-      if (!atlas) return;
-      const hex = pixelToHex(screenToWorld(camera, viewport, at), atlas.atlas.tile);
-      const tile = tileAt(map, hex);
-      const same = selected && tile && selected.q === tile.q && selected.r === tile.r;
-      selected = tile && !same ? { q: tile.q, r: tile.r } : null;
-      const city = tile && map.cities.find((c) => c.q === tile.q && c.r === tile.r);
-      hud.setSelection(tile && !same ? describeTile(tile, city) : null);
-      requestDraw();
+      if (!theme) return;
+      onTap(pixelToHex(screenToWorld(camera, viewport, at), theme.atlas.tile));
     },
   });
 }

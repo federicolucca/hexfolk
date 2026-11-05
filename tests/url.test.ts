@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { describeTile } from '../src/ui/describe';
+import { newGame } from '../src/core/engine';
+import { describeHex } from '../src/ui/describe';
 import { DEFAULT_PLAYERS, parsePlayers, parseSeed, parseTheme, randomSeed, withParams } from '../src/ui/url';
 
 describe('parseSeed', () => {
@@ -57,14 +58,17 @@ describe('randomSeed and withParams', () => {
   });
 });
 
-describe('describeTile', () => {
-  it('names the terrain and any city on it', () => {
-    expect(describeTile({ q: 0, r: 0, terrain: 'mountain' }, undefined)).toBe('Mountain');
-    expect(describeTile({ q: 0, r: 0, terrain: 'grass' }, { q: 0, r: 0, kind: 'capital', owner: 1 })).toBe(
-      'Grass · Red capital',
-    );
-    expect(describeTile({ q: 0, r: 0, terrain: 'grass' }, { q: 0, r: 0, kind: 'village', owner: null })).toBe(
-      'Grass · Neutral village',
-    );
+describe('describeHex', () => {
+  it('names the unit, the city and the terrain on a hex', () => {
+    const state = newGame({ seed: 5, players: 2 });
+    const capital = state.cities.find((c) => c.capital && c.owner === 1);
+    if (!capital) throw new Error('no capital');
+    const d = describeHex(state, capital);
+    expect(d?.title).toBe('Red warrior · 10/10 HP');
+    expect(d?.detail).toBe('Red capital · Grass');
+    const village = state.cities.find((c) => c.owner === null);
+    if (!village) throw new Error('no village');
+    expect(describeHex(state, village)).toEqual({ title: 'Neutral village', detail: 'Grass' });
+    expect(describeHex(state, { q: 99, r: 99 })).toBeNull();
   });
 });

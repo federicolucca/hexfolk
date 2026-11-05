@@ -7,6 +7,18 @@ export const PALETTE = {
   selectionFill: 'rgba(255, 255, 255, 0.22)',
   selectionStroke: '#fff8dc',
   selectionGlow: 'rgba(255, 214, 102, 0.9)',
+  /** Where the selected unit can move. */
+  reachFill: 'rgba(255, 248, 220, 0.55)',
+  reachStroke: 'rgba(43, 42, 31, 0.6)',
+  /** What the selected unit can attack. */
+  targetFill: 'rgba(214, 69, 65, 0.18)',
+  targetStroke: '#e0453f',
+  unitShadow: 'rgba(20, 18, 10, 0.28)',
+  /** Health bars. */
+  healthBack: 'rgba(20, 18, 10, 0.75)',
+  healthGood: '#5fd068',
+  healthLow: '#f0b429',
+  healthBad: '#e0453f',
   /** Ink for drawn details (flag poles, outlines), matching the dark outlines of the tile art. */
   ink: '#2b2a1f',
   /** Player colours, by player index. */

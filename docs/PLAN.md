@@ -1,138 +1,120 @@
 # Plan
 
-How hexfolk v0.1 is put together. The rules are in the [README](../README.md); choices made along
-the way are in [DECISIONS.md](DECISIONS.md).
+How hexfolk v0.1 is put together. The rules are in the [README](../README.md); every choice made
+where a rule was ambiguous is in [DECISIONS.md](DECISIONS.md); the art pipeline is in
+[ART.md](ART.md).
 
 ## Architecture
 
 ```
-src/core    rules, state, map generation, AI. Pure TypeScript: no DOM, no canvas, no globals.
-src/render  Canvas 2D drawing, camera, pointer input. Reads game data, never changes the rules.
-src/ui      HTML HUD (seed, buttons, tile info), URL parameters.
+src/core    the headless engine: rules, state, map generation, agents. Pure TypeScript, no DOM.
+src/render  Canvas 2D drawing, camera, pointer input. Reads state and highlights; decides nothing.
+src/ui      HTML HUD, URL parameters, the browser session (taps -> engine actions).
 src/main.ts wires core, render and ui together.
-tests/      Vitest tests: all of src/core, plus the pure math helpers in src/render and src/ui.
-assets/     tile art per theme (assets/raw/tiles), the source of the atlases.
-scripts/    dev tooling: tile generator (Gemini) and atlas builder (sharp). Not shipped.
+mcp/        the MCP server (stdio) for external agents. Node only, never in the browser bundle.
+scripts/    dev tooling: tile generator, atlas builder, match simulator. Not shipped.
+tests/      Vitest: the engine, agents, replays, and the pure helpers of render and ui.
 public/     static files; public/atlas/ is built from assets/ by `npm run atlas`.
 ```
 
-- **One-way flow.** The UI turns input into actions, `src/core` applies them to the game state and
-  returns a new state, and `src/render` draws that state. Rendering never decides anything.
-- **Plain data.** Every piece of state is JSON-serialisable (no classes, Maps or Sets), so saving
-  is `JSON.stringify` and tests can compare whole states.
-- **Determinism.** Everything random comes from the seeded PRNG in the state, so a seed and a list
-  of actions always replay to the same game.
-- **No runtime dependencies.** Vite and TypeScript at build time; sharp only for building the
-  tile atlases.
+- **One engine, many players.** The browser UI, the built-in AI, the simulator and the MCP server
+  all play through the same four functions in `src/core/engine.ts`:
+
+  ```ts
+  newGame({ seed, players, turnLimit }): GameState
+  observe(state, player): Observation          // what the player sees (v0.1: everything)
+  legalActions(state, player): Action[]        // empty when it is not their turn
+  step(state, player, actions): { state, events, rejected }
+  ```
+
+  `step` never changes its input, applies the actions in order, skips illegal ones with a reason,
+  and reports what happened as events.
+- **Agents.** Anything that plays a seat implements `Agent.decide(observation, legal) -> Action[]`
+  (sync or async) for one whole turn. `playTurn` runs one, times it, ends the turn if the agent did
+  not (the default action) and reports illegal actions. The greedy AI, a random bot, and MCP
+  clients are all agents, so a minimax AI or an LLM can plug in without touching the engine.
+- **Plain data.** The state is JSON-serialisable (no classes, Maps or Sets), so saving is
+  `JSON.stringify` and tests compare whole states.
+- **Determinism.** The map comes from the seed; the rules use no randomness. The same seed and the
+  same actions always give the same game, so a replay is the seed plus the action list.
+- **No fog of war in v0.1.** `observe` returns a copy of the whole state; agents may simulate on it.
+- **No runtime dependencies.** Vite and TypeScript at build time; sharp for the atlases; the MCP
+  SDK and tsx only in the Node tools.
 
 ## Data model
 
-### Today (map milestone)
-
 ```ts
-type Terrain = 'grass' | 'forest' | 'mountain' | 'water';
-interface Tile { q: number; r: number; terrain: Terrain }            // axial, pointy-top
-interface City { q: number; r: number; kind: 'capital' | 'village'; owner: number | null }
-interface GameMap {
-  seed: number; width: 11; height: 11; playerCount: number;
-  tiles: Tile[];   // row-major: tiles[row * width + col], odd-r offset rows
-  cities: City[];  // capitals first, in player order, then neutral villages
-}
-```
-
-### Planned for v0.1
-
-```ts
-type PlayerId = number;                                   // 0 .. playerCount - 1
-type Colour = 'blue' | 'red' | 'yellow' | 'green';        // player 0 is blue, 1 red, 2 yellow, 3 green
-type TechId = 'hunting' | 'fishing' | 'riding' | 'climbing' | 'archery' | 'fortification';
 type UnitType = 'warrior' | 'archer' | 'rider' | 'defender';
+type TechId = 'hunting' | 'fishing' | 'riding' | 'climbing' | 'archery' | 'fortification';
 
-interface Player {
-  id: PlayerId; colour: Colour; human: boolean;
-  stars: number; techs: TechId[]; alive: boolean;
-}
-
-interface City {                    // extends today's City
-  q: number; r: number; kind: 'capital' | 'village';
-  owner: PlayerId | null;
-  population: number;               // grows from resources gathered on adjacent tiles
-  level: number;                    // goes up at population thresholds
-}
-
-interface Unit {
-  id: number; type: UnitType; owner: PlayerId;
-  q: number; r: number; health: number;
-  moved: boolean; attacked: boolean;
-}
-
-interface UnitStats {               // static table, not in the state
-  attack: number; defence: number; movement: number; range: number;
-  health: number; cost: number; tech: TechId | null;
-}
+interface Tile   { q; r; terrain: 'grass' | 'forest' | 'mountain' | 'water'; resource }  // axial
+interface Player { id; stars; techs: TechId[]; alive }
+interface City   { id; q; r; owner: number | null; capital; level; population; walls }
+interface Unit   { id; type; owner; q; r; hp; moved; attacked; home: number | null }
 
 interface GameState {
-  version: 1;
-  rngState: number;                 // PRNG state, for the AI's tie-breaks
-  turn: number;                     // 1 .. 30
-  currentPlayer: PlayerId;
-  map: GameMap;
-  players: Player[];
-  units: Unit[];
-  nextUnitId: number;
-  winner: PlayerId | null;
+  version: 1; seed; turnLimit; turn; current;   // turn is 1-based; current = player to move
+  width; height; tiles: Tile[];                 // 11x11, row-major, odd-r offset rows
+  players; cities; units; nextUnitId;
+  over: boolean; winner: number | null;
 }
 
 type Action =
-  | { type: 'move'; unitId: number; to: { q: number; r: number } }
-  | { type: 'attack'; unitId: number; targetId: number }
-  | { type: 'capture'; unitId: number }
-  | { type: 'train'; city: { q: number; r: number }; unit: UnitType }
+  | { type: 'move'; unit; to: { q; r } }
+  | { type: 'attack'; unit; target }            // target = unit id
+  | { type: 'capture'; unit }
+  | { type: 'train'; city; unit: UnitType }
+  | { type: 'harvest'; at: { q; r } }
   | { type: 'research'; tech: TechId }
-  | { type: 'endTurn' };
-
-// The whole rule set behind one pure function:
-function applyAction(state: GameState, action: Action): GameState;
-function legalActions(state: GameState): Action[];
+  | { type: 'build_walls'; city }
+  | { type: 'end_turn' };
 ```
+
+Unit stats, tech costs and other numbers are tables in `src/core/rules.ts`.
 
 ## Modules
 
 | Module | Status | Responsibility |
 | --- | --- | --- |
-| `core/rng.ts` | done | mulberry32 seeded PRNG |
-| `core/hex.ts` | done | axial helpers: neighbours, distance, offset conversion |
+| `core/rng.ts` | done | mulberry32 seeded PRNG, `hashHex` |
+| `core/hex.ts` | done | axial helpers: neighbours, distance, offset conversion, rounding |
 | `core/map.ts` | done | seeded 11x11 island, capitals and villages |
-| `core/units.ts` | planned | unit stats table, movement range, pathing |
-| `core/techs.ts` | planned | tech tree, costs, what each tech unlocks |
-| `core/economy.ts` | planned | stars per turn, city growth and levels, village capture |
-| `core/combat.ts` | planned | deterministic damage formula |
-| `core/state.ts` | planned | `GameState`, `applyAction`, `legalActions`, victory and score |
-| `core/ai.ts` | planned | greedy heuristic opponent, under 100 ms per turn |
-| `core/save.ts` | planned | versioned autosave to and from JSON |
-| `render/palette.ts` | done | every colour used by the canvas and the HUD |
 | `core/theme.ts` | done | the four themes, `themeFromSeed` |
-| `render/layout.ts` | done | hex to pixel and pixel to hex for the atlas tile spacing |
-| `render/camera.ts` | done | pan, zoom around a point, clamping, world to screen |
-| `render/atlas.ts` | done | atlas format and validation, which frame and variant each tile uses |
-| `render/atlasLoader.ts` | done | loads a theme's atlas, and its @2x image once it is needed |
-| `render/gesture.ts` | done | tap-or-drag threshold, pinch and wheel maths |
-| `render/renderer.ts` | done | draws the map back to front, HiDPI, selection highlight |
-| `render/input.ts` | done | pointer and wheel gestures: tap, drag, pinch, wheel zoom |
-| `render/units.ts` | planned | unit tokens (vector until there is unit art) |
-| `ui/hud.ts` | done | seed, New map button, selected tile |
-| `ui/url.ts` | done | `?seed=`, `?theme=` and `?players=` parsing |
-| `ui/describe.ts` | done | text for the selected tile |
-| `scripts/build-atlas.ts` | done | packs the tile art into per-theme atlases (`npm run atlas`) |
-| `scripts/atlas-geometry.ts` | done | measures the hex in each tile, grid packing (tested) |
+| `core/rules.ts` | done | unit stats, techs, costs and other tunable numbers |
+| `core/state.ts` | done | `GameState`, `Action`, `GameEvent` types |
+| `core/board.ts` | done | lookups: tile, unit and city at a hex |
+| `core/movement.ts` | done | reachable hexes with terrain costs |
+| `core/engine.ts` | done (b) | `newGame`, `observe`, `legalActions`, `checkAction`, `step` |
+| `core/agent.ts` | done (b) | the `Agent` interface, `playTurn`, the pass agent |
+| `core/economy.ts` | (c) | stars per turn, training, harvesting, growth, levels, capture |
+| `core/combat.ts` | (d) | deterministic damage, retaliation, attack preview |
+| `core/techs.ts` | (d) | research, what each tech unlocks |
+| `core/agents/greedy.ts` | (e) | greedy heuristic AI, under 100 ms per turn |
+| `core/agents/random.ts` | (e) | seeded random legal actions (a baseline for the simulator) |
+| `core/score.ts` | (f) | score, victory, end of game |
+| `core/replay.ts` | (g) | JSONL replays: record and rebuild a game |
+| `core/summary.ts` | (g) | a short text summary of an observation, for LLM agents |
+| `render/*` | done | palette, layout, camera, gestures, atlases, renderer, input |
+| `ui/session.ts` | done (b) | the browser game: taps to actions, highlights, agents' turns |
+| `ui/hud.ts` | done (b) | top bar, dock (turn, stars, selection, end turn), card panel |
+| `ui/describe.ts` | done | HUD texts |
+| `ui/url.ts` | done | `?seed=`, `?theme=`, `?players=` |
+| `ui/save.ts` | (f) | autosave to localStorage at every end of turn |
+| `mcp/server.ts` | (g) | MCP server: matches, seats, observations, actions, timeouts, replays |
+| `scripts/sim.ts` | (g) | `npm run sim`: seeded tournaments, JSONL replays, results table |
+| `scripts/build-atlas.ts` | done | per-theme tile atlases and the common atlas (`npm run atlas`) |
 
 ## Milestones
 
-Each milestone ends with green tests, a clean build, a commit and a deploy.
+Each milestone ends with green tests, a clean build, a commit, a deploy check and its GitHub issue
+closed.
 
-1. Map: generation, rendering, pan and zoom, GitHub Pages deploy.
-2. Units: the four unit types and movement.
-3. Cities and economy: stars, growth, levels, village capture.
-4. Techs and combat.
-5. AI opponents.
-6. Release: autosave, victory, docs.
+- (a) Map: generation, rendering, pan and zoom, GitHub Pages deploy. **Done.**
+- (b) Units and movement: the engine API, unit stats, reachable hexes, turn order, tap to move.
+  **Done.**
+- (c) Cities and economy: stars, training, harvesting resources, growth, levels, village capture.
+- (d) Techs and combat: research, deterministic combat with preview, capital capture, walls.
+- (e) Greedy AI behind the agent interface, with a benchmark.
+- (f) Save, victory and docs: autosave, new game with a seed, domination or score at the turn
+  limit, CONTRIBUTING.md, docs/ISSUES.md.
+- (g) Agents and MCP: MCP server, simulator with replays and a results table, replay viewer.
