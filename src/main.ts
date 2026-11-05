@@ -1,5 +1,5 @@
 // Wires the engine, the canvas renderer and the HUD together. Game rules live in src/core only.
-import { passAgent } from './core/agent';
+import { GreedyAgent } from './core/ai';
 import { income } from './core/economy';
 import { newGame } from './core/engine';
 import type { HexRef } from './core/state';
@@ -56,7 +56,7 @@ async function start(app: HTMLElement): Promise<void> {
   let showTechs = false;
 
   function createSession(s: number): Session {
-    const agents = Object.fromEntries(Array.from({ length: players }, (_, i) => [i, passAgent]));
+    const agents = Object.fromEntries(Array.from({ length: players }, (_, i) => [i, new GreedyAgent()]));
     return new Session(newGame({ seed: s, players }), HUMAN, agents);
   }
 

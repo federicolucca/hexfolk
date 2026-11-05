@@ -183,3 +183,12 @@ Choices made where the brief changed or was ambiguous. Newest first.
 - A melee attacker does not move into the hex of a unit it kills. A unit can move and then attack, but not attack and then move.
 - Capturing needs a unit that began its turn on the city (it does not move or attack that turn).
 - No terrain defence bonus and no healing between turns, to keep the rules minimal.
+
+## Milestone (e): the greedy AI
+
+- `GreedyAgent` (src/core/ai) implements `Agent` and repeats one rule per step on a private copy of the state:
+  capture, then favourable attacks (a kill or more damage dealt than taken, never a suicide), then keep two units
+  per city, then research in a fixed order (Hunting, Riding, Archery, Fortification, Climbing, Fishing), harvest,
+  walls on a threatened city, train, and finally move towards the nearest city it does not own (else the nearest enemy).
+- A unit on one of its own cities stays put while an enemy is within 3 hexes (the defence rule).
+- It has no lookahead and no hidden information, so one turn takes a few milliseconds.
