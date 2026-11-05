@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+
+# Third-party 3D sources: fetch with scripts/fetch-assets.sh. Only the derived sprites are committed.
+assets-src/
+.serena/
