@@ -31,8 +31,10 @@ export const isDifficulty = (v: unknown): v is Difficulty => v === 'easy' || v =
 
 export class GreedyAgent implements Agent {
   readonly name: string;
+  readonly difficulty: Difficulty;
 
-  constructor(readonly difficulty: Difficulty = 'normal') {
+  constructor(difficulty: Difficulty = 'normal') {
+    this.difficulty = difficulty;
     this.name = difficulty === 'normal' ? 'greedy' : `greedy-${difficulty}`;
   }
 

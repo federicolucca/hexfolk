@@ -10,3 +10,9 @@ coverage/
 public/atlas/
 .serena/
 .venv/
+
+# Simulator output and Node bundles
+sim-out/
+dist-node/
+packages/mcp/dist/
+packages/mcp/node_modules/

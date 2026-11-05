@@ -15,7 +15,9 @@
     "prebuild": "npm run atlas",
     "build": "tsc --noEmit && tsc --noEmit -p scripts && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "sim": "vite build -c vite.node.config.ts --logLevel error && node dist-node/sim.js",
+    "mcp:build": "npm install --prefix packages/mcp && vite build -c packages/mcp/vite.config.ts --logLevel error"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

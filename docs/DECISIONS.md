@@ -2,6 +2,33 @@
 
 Choices made where the brief changed or was ambiguous. Newest first.
 
+## 2026-11-05: Agents, MCP server, simulator and replays
+
+- **No fog of war.** hexfolk shows the whole board to every player, so `observe()` returns a full copy of the
+  state. The compact observation (`src/core/observation.ts`) is a reformatting of it, not a restriction. If fog is
+  added later, `observe()` is the one place to filter.
+- **Referee.** `Match` (src/core/match.ts) is shared by the simulator and the MCP server: it applies actions through
+  `step`, skips and counts illegal ones, can end a turn by default (`autoEnd`), and records the replay and per-seat
+  stats. Actions queued after a winning move (the trailing `end_turn`) are not counted as illegal.
+- **Replay = header + accepted actions.** JSONL: a header (seed, players, turn limit, seat labels), one line per player
+  turn, a result line. States are rebuilt by running the actions through the engine, so replays stay tiny and
+  determinism is tested (same seed and actions give the identical replay).
+- **MCP server** lives in `packages/mcp` with its own `package.json` (official SDK, zod); the root package and the
+  browser bundle do not depend on it. It is bundled with Vite (`npm run mcp:build`) because `src/core` uses
+  extensionless imports. Handlers are plain async methods (`handlers.ts`) and are tested directly, no network.
+- **Seats and timeouts.** The match starts at the first `join_match`; unjoined seats are played by the greedy AI
+  (difficulty from `create_match`, default normal). A joined seat's deadline is enforced lazily, on the next call
+  that touches the match: past it, the turn ends by default (`end_turn`) and counts as a timeout. There is no
+  authentication: stdio is a single local client.
+- **Turns end explicitly** for MCP clients (they may submit in several calls); the simulator's runner ends the
+  turn for an agent that does not.
+- **`npm run sim`** bundles `scripts/sim.ts` with `vite.node.config.ts` and runs 2-player round-robins, each pairing
+  from both seats on each seed (mirrored). Elo is a maximum-likelihood fit with one virtual draw per pair (so a clean
+  sweep stays finite), not a running Elo. Built-in agents never submit illegal actions, so that column is 0 until an
+  external agent is plugged in; plugging one in is future work.
+- **Replay viewer.** `?replay=<url>` or the Replay button; the existing renderer draws each rebuilt state, and the game
+  underneath is left untouched.
+
 ## 2026-11-05: AI difficulty
 
 - `GreedyAgent(difficulty)`: `normal` is the unchanged greedy AI. `easy` (the UI default) is the same agent with

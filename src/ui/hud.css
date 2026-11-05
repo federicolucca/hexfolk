@@ -37,6 +37,7 @@ body {
 
 .hf-bar,
 .hf-dock,
+.hf-replay,
 .hf-panel {
   position: absolute;
   left: 50%;
@@ -104,6 +105,25 @@ body {
   display: block;
   color: var(--hf-muted);
   font-size: 12px;
+}
+
+.hf-replay {
+  bottom: calc(max(10px, env(safe-area-inset-bottom)) + 70px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+}
+
+.hf-replay[hidden] {
+  display: none;
+}
+
+.hf-replay .hf-button {
+  min-height: 44px;
+  min-width: 48px;
+  padding: 0 14px;
 }
 
 .hf-panel {

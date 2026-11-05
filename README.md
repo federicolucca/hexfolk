@@ -98,6 +98,53 @@ v0.1 is playable: 1 human against 1 to 3 AIs, ending by domination or the highes
 After v0.1, possible additions include more tribes, a minimax AI, larger maps and more techs and
 units. None of these are planned yet.
 
+## Agents & MCP
+
+hexfolk is also a small testbed for game-playing agents. The rules live in a pure, deterministic TypeScript
+engine (`src/core`: `newGame`, `observe`, `legalActions`, `step`), so the same code runs in the browser, in a
+headless simulator and behind an MCP server. There is no fog of war: `observe()` returns the whole board.
+No LLM results exist yet; what is here is the harness and three built-in baselines (`random`, `greedy-easy`,
+`greedy-normal`).
+
+**MCP server** (`packages/mcp`, stdio, official `@modelcontextprotocol/sdk`). Its dependencies live in
+`packages/mcp/package.json` only: they never enter the browser bundle or the root `package.json`.
+
+```sh
+npm install                 # root dev tools
+npm run mcp:build           # installs packages/mcp deps and bundles packages/mcp/dist/server.js
+node packages/mcp/examples/pass-client.mjs   # smoke test: a tiny MCP client plays one match
+```
+
+Claude Code: `claude mcp add hexfolk -- node /absolute/path/to/hexfolk/packages/mcp/dist/server.js`
+
+Claude Desktop (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "hexfolk": { "command": "node", "args": ["/absolute/path/to/hexfolk/packages/mcp/dist/server.js"] }
+  }
+}
+```
+
+Tools: `create_match(seed?, players, turn_limit, difficulty?)`, `join_match(match_id, seat)`,
+`get_observation` (compact JSON plus a short text summary), `list_legal_actions`, `submit_actions`,
+`get_match_status`, `get_replay` (JSONL). Seats nobody joins are played by the built-in AI once the match
+starts (the first `join_match` starts it). Every action is validated server-side; illegal ones are rejected
+with a reason and never applied. A joined seat has a per-turn timeout (`turn_timeout_ms`, default 120 s);
+when it passes, the turn ends by default (`end_turn`). The turn only ends when the client submits
+`{"type":"end_turn"}`, so an agent can act in several calls.
+
+**Simulator.** `npm run sim -- --seeds 7` plays every pair of `random`, `greedy-easy` and `greedy-normal`
+from both seats on each seed (mirrored; 42 matches for 7 seeds), and writes JSONL replays plus `results.md`
+(win rate with a 95% Wilson interval, Elo, average turns, illegal-action rate, timeouts, decision latency)
+to `sim-out/` (gitignored). Options: `--first-seed`, `--turn-limit`, `--agents a,b`, `--out`,
+`--timeout-ms`. Plugging in an external MCP/LLM agent is future work: an `Agent` whose `decide()` calls
+out would do it; the sim makes no network calls and needs no API keys.
+
+**Replay viewer.** Open the game with `?replay=<url>` (for example `?replay=replays/sample.jsonl`) or use
+the Replay button to load a `.jsonl` file, then step with first / previous / play / next / last.
+
 ## Contributing
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and look for issues labelled

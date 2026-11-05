@@ -4,6 +4,7 @@ import { income } from './core/economy';
 import { newGame } from './core/engine';
 import type { GameState, HexRef } from './core/state';
 import { type Theme, themeFromSeed } from './core/theme';
+import { parseReplay } from './core/replay';
 import { frameExtents } from './render/atlas';
 import { AtlasLoader, type LoadedAtlas, type LoadedCommon } from './render/atlasLoader';
 import {
@@ -22,7 +23,8 @@ import { type Bounds, hexToPixel, mapBounds, pixelToHex } from './render/layout'
 import { drawScene, wantsHd } from './render/renderer';
 import { describeHex, endSummary, playerName, starsLine, turnLine } from './ui/describe';
 import { panelFor, techPanel } from './ui/panels';
-import { applyPalette, createHud } from './ui/hud';
+import { applyPalette, createHud, type ReplayCommand } from './ui/hud';
+import { ReplayPlayer } from './ui/replayPlayer';
 import { loadGame, saveGame } from './ui/save';
 import { Session } from './ui/session';
 import { parseDifficulty, parsePlayers, parseSeed, parseTheme, randomSeed, withParams } from './ui/url';
@@ -67,6 +69,11 @@ async function start(app: HTMLElement): Promise<void> {
   let loadToken = 0;
   let busy = false;
   let showTechs = false;
+  /** A replay being watched; the game underneath is untouched until the player exits it. */
+  let replay: ReplayPlayer | null = null;
+  let playTimer = 0;
+  const shown = (): GameState => replay?.state ?? session.state;
+  const NO_HIGHLIGHTS = { selected: null, reach: [], targets: [], done: [] };
 
   function createSession(s: number, from: GameState | null = null): Session {
     const count = from?.players.length ?? players;
@@ -74,7 +81,7 @@ async function start(app: HTMLElement): Promise<void> {
     return new Session(from ?? newGame({ seed: s, players }), HUMAN, agents);
   }
 
-  const themeName = (): Theme => themeOverride ?? themeFromSeed(seed);
+  const themeName = (): Theme => themeOverride ?? themeFromSeed(replay?.replay.header.seed ?? seed);
 
   const draw = (): void => {
     if (!theme || !common) return;
@@ -82,7 +89,7 @@ async function start(app: HTMLElement): Promise<void> {
       loader.requestHd(theme, requestDraw);
       loader.requestHd(common, requestDraw);
     }
-    drawScene(ctx, { game: session.state, theme, common, camera, viewport, pixelRatio, highlights: session.highlights() });
+    drawScene(ctx, { game: shown(), theme, common, camera, viewport, pixelRatio, highlights: replay ? NO_HIGHLIGHTS : session.highlights() });
   };
 
   function requestDraw(): void {
@@ -95,6 +102,20 @@ async function start(app: HTMLElement): Promise<void> {
 
   /** Refreshes every HUD element from the session. */
   const refresh = (): void => {
+    if (replay) {
+      const s = replay.state;
+      const d = replay.describe();
+      hud.setStatus(turnLine(s), s.players.map((p) => `${playerName(p.id)} ${p.stars}`).join(' · ') + ' stars');
+      hud.setInfo(d.title, d.detail);
+      hud.setEndTurn(false, 'Replay');
+      hud.setEnd(null);
+      hud.setTools([]);
+      hud.setPanel(null);
+      hud.setReplay({ playing: playTimer !== 0, atStart: replay.atStart, atEnd: replay.atEnd });
+      requestDraw();
+      return;
+    }
+    hud.setReplay(null);
     const state = session.state;
     hud.setStatus(turnLine(state), starsLine(state, HUMAN, income(state, HUMAN)));
     const info = session.selectedHex ? describeHex(state, session.selectedHex) : null;
@@ -140,7 +161,7 @@ async function start(app: HTMLElement): Promise<void> {
   const updateBounds = (refit: boolean): void => {
     if (!theme) return;
     const { above, below } = frameExtents(theme.atlas);
-    bounds = mapBounds(session.state.tiles, theme.atlas.tile, above, below);
+    bounds = mapBounds(shown().tiles, theme.atlas.tile, above, below);
     camera = refit ? fitCamera(bounds, viewport) : clampCamera(camera, bounds, zoomLimits(bounds, viewport));
   };
 
@@ -169,7 +190,64 @@ async function start(app: HTMLElement): Promise<void> {
     hud.setMessage(`Something went wrong: ${err instanceof Error ? err.message : String(err)}`);
   };
 
+  const stopPlay = (): void => {
+    if (playTimer) window.clearInterval(playTimer);
+    playTimer = 0;
+  };
+
+  const openReplay = (text: string, name: string): void => {
+    try {
+      const player = new ReplayPlayer(parseReplay(text));
+      stopPlay();
+      replay = player;
+      showTheme(true).catch(fail);
+    } catch (err) {
+      hud.setMessage(`Could not load replay ${name}: ${err instanceof Error ? err.message : String(err)}`);
+      window.setTimeout(() => hud.setMessage(null), 4000);
+    }
+  };
+
+  const loadReplayUrl = async (raw: string): Promise<void> => {
+    try {
+      const res = await fetch(new URL(raw, location.href));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      openReplay(await res.text(), raw);
+    } catch (err) {
+      hud.setMessage(`Could not load replay ${raw}: ${err instanceof Error ? err.message : String(err)}`);
+      window.setTimeout(() => hud.setMessage(null), 4000);
+    }
+  };
+
+  const replayControl = (command: ReplayCommand): void => {
+    if (!replay) return;
+    if (command === 'exit') {
+      stopPlay();
+      replay = null;
+      showTheme(true).catch(fail);
+      return;
+    }
+    if (command === 'play') {
+      if (playTimer) stopPlay();
+      else {
+        if (replay.atEnd) replay.seek(0);
+        playTimer = window.setInterval(() => {
+          if (!replay?.next()) stopPlay();
+          refresh();
+        }, 700);
+      }
+    } else {
+      stopPlay();
+      if (command === 'first') replay.seek(0);
+      else if (command === 'last') replay.seek(replay.steps);
+      else if (command === 'prev') replay.prev();
+      else replay.next();
+    }
+    refresh();
+  };
+
   const hud = createHud(app, {
+    onReplayText: openReplay,
+    onReplayControl: replayControl,
     onNewGame: (typed, chosen) => {
       seed = typed ?? randomSeed();
       difficulty = chosen;
@@ -217,9 +295,11 @@ async function start(app: HTMLElement): Promise<void> {
   resize();
   new ResizeObserver(resize).observe(canvas);
   await showTheme(true);
+  const replayUrl = new URLSearchParams(location.search).get('replay');
+  if (replayUrl) await loadReplayUrl(replayUrl);
 
   const onTap = (hex: HexRef): void => {
-    if (busy) return;
+    if (busy || replay) return;
     showTechs = false;
     session.tap(hex);
     refresh();

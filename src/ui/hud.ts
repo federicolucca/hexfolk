@@ -33,6 +33,8 @@ export interface Hud {
   setPanel(title: string | null, cards?: Card[]): void;
   /** Buttons in the top bar after New game (e.g. Techs); replaces the previous ones. */
   setTools(buttons: { label: string; onClick: () => void; active?: boolean }[]): void;
+  /** The replay controls above the dock; null hides them. */
+  setReplay(state: { playing: boolean; atStart: boolean; atEnd: boolean } | null): void;
   setCommonAtlas(common: LoadedCommon, baseUrl: string): void;
   /** A full-screen message, e.g. while loading or on error; null hides it. */
   setMessage(text: string | null): void;
@@ -44,7 +46,12 @@ export interface HudActions {
   /** undefined means "Auto": the theme follows the seed. */
   onThemeChange(theme: Theme | undefined): void;
   onEndTurn(): void;
+  /** The text of a replay file the player picked. */
+  onReplayText(text: string, name: string): void;
+  onReplayControl(command: ReplayCommand): void;
 }
+
+export type ReplayCommand = 'first' | 'prev' | 'play' | 'next' | 'last' | 'exit';
 
 /** Copies the HUD colours from the palette into CSS custom properties. */
 export function applyPalette(root: HTMLElement): void {
@@ -112,7 +119,40 @@ export function createHud(container: HTMLElement, actions: HudActions): Hud {
   newGame.addEventListener('click', requestNew);
   const tools = element('span');
   tools.style.display = 'contents';
-  bar.append(element('span', 'hf-title', 'hexfolk'), seed, select, difficulty, newGame, tools);
+  const file = element('input');
+  file.type = 'file';
+  file.accept = '.jsonl,.json,.txt';
+  file.hidden = true;
+  file.setAttribute('aria-label', 'Replay file');
+  file.addEventListener('change', () => {
+    const picked = file.files?.[0];
+    file.value = '';
+    if (picked) picked.text().then((text) => actions.onReplayText(text, picked.name), () => actions.onReplayText('', picked.name));
+  });
+  const load = element('button', 'hf-button hf-secondary', 'Replay');
+  load.type = 'button';
+  load.title = 'Load a replay (.jsonl) from the simulator or the MCP server';
+  load.addEventListener('click', () => file.click());
+  bar.append(element('span', 'hf-title', 'hexfolk'), seed, select, difficulty, newGame, load, file, tools);
+
+  const replayBar = element('div', 'hf-replay');
+  replayBar.hidden = true;
+  replayBar.setAttribute('role', 'group');
+  replayBar.setAttribute('aria-label', 'Replay controls');
+  const replayButton = (label: string, aria: string, command: ReplayCommand): HTMLButtonElement => {
+    const b = element('button', 'hf-button hf-secondary', label);
+    b.type = 'button';
+    b.setAttribute('aria-label', aria);
+    b.addEventListener('click', () => actions.onReplayControl(command));
+    return b;
+  };
+  const firstBtn = replayButton('⏮', 'First step', 'first');
+  const prevBtn = replayButton('◀', 'Previous step', 'prev');
+  const playBtn = replayButton('▶', 'Play', 'play');
+  const nextBtn = replayButton('▶❘', 'Next step', 'next');
+  const lastBtn = replayButton('⏭', 'Last step', 'last');
+  const exitBtn = replayButton('Exit', 'Leave the replay', 'exit');
+  replayBar.append(firstBtn, prevBtn, playBtn, nextBtn, lastBtn, exitBtn);
 
   const dock = element('div', 'hf-dock');
   const status = element('div', 'hf-status');
@@ -135,7 +175,7 @@ export function createHud(container: HTMLElement, actions: HudActions): Hud {
   const end = element('div', 'hf-end');
   end.hidden = true;
 
-  container.append(bar, panel, dock, message, end);
+  container.append(bar, panel, replayBar, dock, message, end);
   return {
     setSeed: (value) => {
       seed.value = String(value);
@@ -192,6 +232,14 @@ export function createHud(container: HTMLElement, actions: HudActions): Hud {
           return el;
         }),
       );
+    },
+    setReplay: (state) => {
+      replayBar.hidden = state === null;
+      if (!state) return;
+      firstBtn.disabled = prevBtn.disabled = state.atStart;
+      nextBtn.disabled = lastBtn.disabled = state.atEnd;
+      playBtn.textContent = state.playing ? '⏸' : '▶';
+      playBtn.setAttribute('aria-label', state.playing ? 'Pause' : 'Play');
     },
     setCommonAtlas: (loaded, baseUrl) => {
       common = { loaded, url: `${baseUrl}${loaded.atlas.images['2']}` };
