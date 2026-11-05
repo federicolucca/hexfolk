@@ -11,8 +11,9 @@ src/render  Canvas 2D drawing, camera, pointer input. Reads game data, never cha
 src/ui      HTML HUD (seed, buttons, tile info), URL parameters.
 src/main.ts wires core, render and ui together.
 tests/      Vitest tests: all of src/core, plus the pure math helpers in src/render and src/ui.
-scripts/    dev tooling: asset fetch and sprite pre-rendering (not shipped).
-public/     static files, including the pre-rendered sprites and their manifest.
+assets/     tile art per theme (assets/raw/tiles), the source of the atlases.
+scripts/    dev tooling: tile generator (Gemini) and atlas builder (sharp). Not shipped.
+public/     static files; public/atlas/ is built from assets/ by `npm run atlas`.
 ```
 
 - **One-way flow.** The UI turns input into actions, `src/core` applies them to the game state and
@@ -21,8 +22,8 @@ public/     static files, including the pre-rendered sprites and their manifest.
   is `JSON.stringify` and tests can compare whole states.
 - **Determinism.** Everything random comes from the seeded PRNG in the state, so a seed and a list
   of actions always replay to the same game.
-- **No runtime dependencies.** Vite and TypeScript at build time; three.js and Playwright only for
-  pre-rendering sprites.
+- **No runtime dependencies.** Vite and TypeScript at build time; sharp only for building the
+  tile atlases.
 
 ## Data model
 
@@ -110,17 +111,20 @@ function legalActions(state: GameState): Action[];
 | `core/ai.ts` | planned | greedy heuristic opponent, under 100 ms per turn |
 | `core/save.ts` | planned | versioned autosave to and from JSON |
 | `render/palette.ts` | done | every colour used by the canvas and the HUD |
-| `render/layout.ts` | done | hex to pixel and pixel to hex for the sprite projection |
+| `core/theme.ts` | done | the four themes, `themeFromSeed` |
+| `render/layout.ts` | done | hex to pixel and pixel to hex for the atlas tile spacing |
 | `render/camera.ts` | done | pan, zoom around a point, clamping, world to screen |
-| `render/sprites.ts` | done | loads `sprites/manifest.json` and the PNGs |
-| `render/spriteMap.ts` | done | which sprite each tile uses, manifest validation |
+| `render/atlas.ts` | done | atlas format and validation, which frame and variant each tile uses |
+| `render/atlasLoader.ts` | done | loads a theme's atlas, and its @2x image once it is needed |
 | `render/gesture.ts` | done | tap-or-drag threshold, pinch and wheel maths |
 | `render/renderer.ts` | done | draws the map back to front, HiDPI, selection highlight |
 | `render/input.ts` | done | pointer and wheel gestures: tap, drag, pinch, wheel zoom |
-| `render/units.ts` | planned | unit tokens (vector, the art pack has no characters) |
+| `render/units.ts` | planned | unit tokens (vector until there is unit art) |
 | `ui/hud.ts` | done | seed, New map button, selected tile |
-| `ui/url.ts` | done | `?seed=` and `?players=` parsing |
+| `ui/url.ts` | done | `?seed=`, `?theme=` and `?players=` parsing |
 | `ui/describe.ts` | done | text for the selected tile |
+| `scripts/build-atlas.ts` | done | packs the tile art into per-theme atlases (`npm run atlas`) |
+| `scripts/atlas-geometry.ts` | done | measures the hex in each tile, grid packing (tested) |
 
 ## Milestones
 

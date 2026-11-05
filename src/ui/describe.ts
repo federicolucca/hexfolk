@@ -1,6 +1,6 @@
 // Text for the selected-tile panel. Pure: no DOM.
 import type { City, Tile } from '../core/map';
-import { PLAYER_COLOURS } from '../render/spriteMap';
+import { PALETTE } from '../render/palette';
 
 const TERRAIN_NAMES: Record<Tile['terrain'], string> = {
   grass: 'Grass',
@@ -12,7 +12,6 @@ const TERRAIN_NAMES: Record<Tile['terrain'], string> = {
 export function describeTile(tile: Tile, city: City | undefined): string {
   const terrain = TERRAIN_NAMES[tile.terrain];
   if (!city) return terrain;
-  const colour = city.owner === null ? undefined : PLAYER_COLOURS[city.owner];
-  const owner = colour ? `${colour[0]?.toUpperCase()}${colour.slice(1)}` : 'Neutral';
+  const owner = city.owner === null ? 'Neutral' : (PALETTE.players[city.owner]?.name ?? 'Neutral');
   return `${terrain} · ${owner} ${city.kind}`;
 }

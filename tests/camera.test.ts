@@ -72,7 +72,7 @@ describe('pan and zoom', () => {
 });
 
 describe('fitting and clamping', () => {
-  it('fits the whole map when the viewport and the map have the same shape', () => {
+  it('fits the whole map on a landscape or square screen', () => {
     const square = { width: 532, height: 532 }; // B is 2000 x 1500 plus margins
     const v = { width: 2032, height: 1532 };
     const c = fitCamera(B, v);
@@ -85,7 +85,7 @@ describe('fitting and clamping', () => {
     expect(topLeft.y).toBeGreaterThanOrEqual(0);
     expect(bottomRight.x).toBeLessThanOrEqual(v.width);
     expect(bottomRight.y).toBeLessThanOrEqual(v.height);
-    expect(fitCamera(B, square).zoom).toBeGreaterThanOrEqual(fitZoom(B, square));
+    expect(fitCamera(B, square).zoom).toBeCloseTo(fitZoom(B, square));
   });
 
   it('zooms in further than the whole-map fit on a tall phone screen', () => {

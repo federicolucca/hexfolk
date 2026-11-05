@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { describeTile } from '../src/ui/describe';
-import { DEFAULT_PLAYERS, parsePlayers, parseSeed, randomSeed, withSeed } from '../src/ui/url';
+import { DEFAULT_PLAYERS, parsePlayers, parseSeed, parseTheme, randomSeed, withParams } from '../src/ui/url';
 
 describe('parseSeed', () => {
   it('reads an unsigned 32-bit seed', () => {
@@ -29,7 +29,19 @@ describe('parsePlayers', () => {
   });
 });
 
-describe('randomSeed and withSeed', () => {
+describe('parseTheme', () => {
+  it('reads a known theme, case-insensitively', () => {
+    expect(parseTheme('?theme=icelands')).toBe('icelands');
+    expect(parseTheme('?seed=1&theme=DeadLands')).toBe('deadlands');
+  });
+
+  it('ignores missing or unknown themes', () => {
+    expect(parseTheme('')).toBeUndefined();
+    expect(parseTheme('?theme=sandlands')).toBeUndefined();
+  });
+});
+
+describe('randomSeed and withParams', () => {
   it('maps [0, 1) onto the full seed range', () => {
     expect(randomSeed(() => 0)).toBe(0);
     expect(randomSeed(() => 0.999999999999)).toBe(4294967295);
@@ -37,9 +49,11 @@ describe('randomSeed and withSeed', () => {
     expect(Number.isInteger(seed) && seed >= 0 && seed <= 4294967295).toBe(true);
   });
 
-  it('sets the seed and keeps other parameters', () => {
-    expect(withSeed('', 7)).toBe('?seed=7');
-    expect(withSeed('?players=2&seed=1', 9)).toBe('?players=2&seed=9');
+  it('sets the seed and the theme and keeps other parameters', () => {
+    expect(withParams('', 7, undefined)).toBe('?seed=7');
+    expect(withParams('?players=2&seed=1', 9, undefined)).toBe('?players=2&seed=9');
+    expect(withParams('?seed=1', 9, 'drylands')).toBe('?seed=9&theme=drylands');
+    expect(withParams('?seed=1&theme=icelands', 9, undefined)).toBe('?seed=9');
   });
 });
 

@@ -1,5 +1,4 @@
-// Projection between hexes and world pixels for the pre-rendered sprites.
-// World pixels are sprite pixels at zoom 1. A hex's position is the centre of its top face.
+// Projection between hexes and world pixels. World pixels are 1x atlas pixels (a tile is 128 wide). A hex's position is the centre of its top face.
 import { type Hex, roundHex } from '../core/hex';
 
 export interface Point {
@@ -7,7 +6,7 @@ export interface Point {
   y: number;
 }
 
-/** How hexes tile on screen, from public/sprites/manifest.json. */
+/** How hexes tile on screen, from the theme atlas (public/atlas/<theme>.json). */
 export interface TileMetrics {
   width: number;
   columnStep: number;

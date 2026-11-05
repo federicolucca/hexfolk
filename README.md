@@ -7,15 +7,15 @@ in under 30 turns.
 > **Status: map milestone.** A seeded island you can pan, zoom and inspect. Units and rules come
 > next; this README describes what v0.1 will be.
 
-**Demo:** https://federicolucca.github.io/hexfolk/ (add `?seed=123` for a given map, `&players=2` for
-fewer capitals)
+**Demo:** https://federicolucca.github.io/hexfolk/ (add `?seed=123` for a given map, `&theme=icelands`
+to pick the theme, `&players=2` for fewer capitals)
 
 ## What it is
 
 hexfolk is a single-player game: you lead one tribe against 1 to 3 AI opponents. Every game is
-short, readable at a glance and playable one-handed on a phone. The art comes from Kay Lousberg's
-CC0 [KayKit Medieval Hexagon Pack](https://kaylousberg.itch.io/kaykit-medieval-hexagon),
-pre-rendered into 2D sprites and drawn on a canvas. There is no backend and nothing to install.
+short, readable at a glance and playable one-handed on a phone. Each game is set in one of four
+themes (greenlands, drylands, icelands, deadlands) with its own hand-drawn-style tile art, drawn on
+a canvas. There is no backend and nothing to install.
 
 ### Rules (v0.1)
 
@@ -48,8 +48,8 @@ pre-rendered into 2D sprites and drawn on a canvas. There is no backend and noth
   rendering code. They can be tested in isolation, and the AI can be swapped for a smarter one
   (for example, minimax) later on.
 - **Fast on phones.** An AI turn takes under 100 ms on a mobile device.
-- **Zero runtime dependencies.** TypeScript, Vite and native Canvas 2D. No UI framework and no 3D
-  engine: the 3D models are turned into sprites ahead of time.
+- **Zero runtime dependencies.** TypeScript, Vite and native Canvas 2D. No UI framework: the
+  tiles are packed into one image atlas per theme at build time.
 
 ## Tech stack
 
@@ -61,14 +61,15 @@ pre-rendered into 2D sprites and drawn on a canvas. There is no backend and noth
 src/core    rules, state, map generation, AI (pure, no DOM)
 src/render  canvas drawing, touch and mouse input
 src/ui      minimal HTML/CSS HUD
-tests/      Vitest tests for src/core
-scripts/    dev tooling (asset fetch, sprite pre-rendering)
-public/     committed sprites and static files
+tests/      Vitest tests for src/core and the pure helpers
+assets/     tile art: assets/raw/tiles/<theme>/<terrain>_<n>.png plus manifest.json
+scripts/    dev tooling: tile generator, atlas builder
+public/     static files; public/atlas/ is built from assets/ and not committed
 ```
 
-The KayKit glTF sources are not committed. Run `./scripts/fetch-assets.sh` to download them,
-pinned to a fixed upstream commit, into `assets-src/` (gitignored). You only need this to
-re-render the sprites.
+`npm run atlas` (run automatically before `dev` and `build`) packs each theme's tiles into
+`public/atlas/<theme>.png` (128 px tiles), `<theme>@2x.png` (256 px, used on HiDPI screens and
+close zoom) and `<theme>.json` (frames, the centre of each hex face, variants per terrain).
 
 ## Running locally
 
@@ -76,8 +77,8 @@ re-render the sprites.
 npm install
 npm run dev      # start the dev server
 npm test         # run the tests
-npm run build    # build for production
-npm run sprites  # re-render public/sprites/ (needs ./scripts/fetch-assets.sh first)
+npm run build    # build for production (builds the tile atlas first)
+npm run atlas    # rebuild the tile atlas after changing assets/raw/tiles
 ```
 
 ## Roadmap
@@ -101,11 +102,12 @@ Contributions are welcome once the first milestone is published. Look for issues
 `good first issue`. A `CONTRIBUTING.md` will describe the workflow. The short version: keep game
 logic in `src/core` with tests, and keep rendering free of rules.
 
-## Credits
+## Art
 
-Art: [KayKit Medieval Hexagon Pack](https://kaylousberg.itch.io/kaykit-medieval-hexagon) by
-[Kay Lousberg](https://www.kaylousberg.com), CC0. See [CREDITS.md](CREDITS.md).
+Tile art: original, generated for hexfolk with Gemini from the author's prompts
+(`scripts/gen_tiles_gemini.py`).
 
 ## Licence
 
-Code: MIT. Art: CC0 (KayKit). hexfolk's names and rules are original.
+Code: MIT (see [LICENSE](LICENSE)). The licence for the tile art is not decided yet. hexfolk's
+names and rules are original.

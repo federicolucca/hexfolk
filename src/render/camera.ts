@@ -18,8 +18,8 @@ export interface ZoomLimits {
   max: number;
 }
 
-/** Sprites are 256 px per tile; zooming in past this only blurs them. */
-export const MAX_ZOOM = 1.25;
+/** World units are 1x atlas pixels (128 per tile); the @2x atlas keeps tiles sharp up to here. */
+export const MAX_ZOOM = 2.5;
 
 export function worldToScreen(c: Camera, v: Viewport, p: Point): Point {
   return { x: (p.x - c.x) * c.zoom + v.width / 2, y: (p.y - c.y) * c.zoom + v.height / 2 };
@@ -55,17 +55,18 @@ export function zoomLimits(b: Bounds, v: Viewport): ZoomLimits {
 }
 
 /**
- * The starting view, centred on the bounds. When the viewport and the map have similar shapes this
- * is the whole map. On a tall phone screen the whole (wide) map would be tiny, so the zoom is the
- * geometric mean of the width fit and the height fit: bigger tiles, and a short pan to see the rest.
+ * The starting view, centred on the bounds. On a landscape screen this is the whole map. On a
+ * portrait phone the whole map would be small, so the zoom is the geometric mean of the width fit
+ * and the height fit: bigger tiles, and a short pan to see the rest.
  */
 export function fitCamera(b: Bounds, v: Viewport, margin = 16): Camera {
   const limits = zoomLimits(b, v);
   const z = fitZooms(b, v, margin);
+  const zoom = v.height > v.width ? Math.sqrt(z.width * z.height) : Math.min(z.width, z.height);
   return {
     x: (b.minX + b.maxX) / 2,
     y: (b.minY + b.maxY) / 2,
-    zoom: clamp(Math.sqrt(z.width * z.height), limits.min, limits.max),
+    zoom: clamp(zoom, limits.min, limits.max),
   };
 }
 

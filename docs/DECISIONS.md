@@ -2,6 +2,45 @@
 
 Choices made where the brief changed or was ambiguous. Newest first.
 
+## 2026-11-05: Own tile art in four themes; KayKit dropped
+
+- **Change:** KayKit is gone (models, pre-render script, sprites, credits, licence file, three.js and
+  Playwright dependencies). The tiles are original art generated for hexfolk with Gemini from the
+  author's prompts by `scripts/gen_tiles_gemini.py`. **The art licence is to be decided**; the code
+  stays MIT. The entries below about KayKit and sprites are kept as history.
+- **Source art:** `assets/raw/tiles/<theme>/<terrain>_<n>.png` plus `manifest.json`, committed.
+  Four themes (greenlands, drylands, icelands, deadlands); terrains grass (3 variants), forest (3),
+  hill (2), mountain, water, village, capital, ruins. Tiles are top-down pointy-top hexes, about
+  256 x 287 px, each with its own dark outline. The uncropped generator output (`*.raw.png`, 48 MB)
+  is ignored.
+- **Atlas build:** `npm run atlas` (`scripts/build-atlas.ts`, sharp, run by Node's built-in type
+  stripping) runs before `dev` and `build`, so CI builds it too; `public/atlas/` is not committed.
+  For each tile it measures the hex from the alpha mask: the slanted top and bottom edges are fitted
+  as lines, using the longest opaque run per row, so halos and stray marks outside the hex (greenlands
+  and drylands water) are ignored. The face centre is the shoulder plus half the median side length,
+  so tiles drawn with some thickness below still line up.
+- **Resizing only:** each tile is scaled so its hex is 256 px wide (@2x) and 128 px (1x). A tile
+  whose hex is drawn more than 3% shorter than its theme's median is also stretched vertically (at
+  most 10%) to close the gaps it would leave: greenlands water (3%), drylands forest_1 (3%), drylands
+  mountain (8%) and deadlands capital (6%). The build logs these. Regenerating those tiles would
+  remove the need. Nothing else about the pixels changes.
+- **Two scales:** 1x (128 px tiles) is always loaded; @2x (256 px) loads on demand once a 1x pixel
+  would cover more than 1.15 device pixels (HiDPI screens, or zooming in). It is clearly sharper on
+  phones and up close, and it lets the maximum zoom go to 2.5x (320 CSS px per tile).
+- **Spacing:** measured from the art, as medians per theme: column step = hex width - 1 px, row step
+  = top triangle + side - 1.5 px (about 106 px at 1x), so neighbouring outlines overlap slightly and
+  leave no seams. The background is a dark ink-slate, so any remaining sliver reads as outline.
+- **Mapping:** grass, forest, mountain and water use their terrain's tiles; a village or capital
+  uses the village or capital tile. **Hill and ruins stay in the atlas only:** hills read as a
+  different terrain (players would expect rules), so they are not used as grass variants.
+- **Variants:** picked by `hashHex(seed, q, r) % count`, so a map always looks the same.
+- **Ownership:** the capital tiles have no player colour, so the renderer draws a small pennant in
+  the owner's palette colour on owned cities. The per-colour KayKit capitals are gone.
+- **Theme:** `themeFromSeed(seed)` (its own PRNG stream, so independent of the layout) picks one of
+  the four. `?theme=` or the HUD select overrides it; "Auto" follows the seed.
+- **Start view:** on a landscape screen the whole map fits; on a portrait screen the zoom is the
+  geometric mean of the width and height fits (the map is about square now).
+
 ## 2026-11-05: Map rendering and deploy
 
 - **Projection:** a hex's world position is the centre of its top face in sprite pixels:

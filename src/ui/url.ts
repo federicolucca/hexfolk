@@ -1,5 +1,6 @@
 // URL parameters: pure parsing, no DOM.
 import { MAX_PLAYERS, MIN_PLAYERS } from '../core/map';
+import { isTheme, type Theme } from '../core/theme';
 
 export const DEFAULT_PLAYERS = 4;
 const MAX_SEED = 0xffffffff;
@@ -19,14 +20,22 @@ export function parsePlayers(search: string): number {
   return Number.isInteger(players) && players >= MIN_PLAYERS && players <= MAX_PLAYERS ? players : DEFAULT_PLAYERS;
 }
 
+/** ?theme= when it names a theme; otherwise undefined (the theme then follows the seed). */
+export function parseTheme(search: string): Theme | undefined {
+  const raw = new URLSearchParams(search).get('theme')?.trim().toLowerCase();
+  return isTheme(raw) ? raw : undefined;
+}
+
 /** A random seed from a [0, 1) source (Math.random by default). */
 export function randomSeed(random: () => number = Math.random): number {
   return Math.floor(random() * (MAX_SEED + 1)) >>> 0;
 }
 
-/** The same search string with ?seed= set, keeping other parameters. */
-export function withSeed(search: string, seed: number): string {
+/** The same search string with ?seed= set and ?theme= set or removed, keeping other parameters. */
+export function withParams(search: string, seed: number, theme: Theme | undefined): string {
   const params = new URLSearchParams(search);
   params.set('seed', String(seed));
+  if (theme) params.set('theme', theme);
+  else params.delete('theme');
   return `?${params.toString()}`;
 }

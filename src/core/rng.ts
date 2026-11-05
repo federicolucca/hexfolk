@@ -32,3 +32,11 @@ export function createRng(seed: number): Rng {
     },
   };
 }
+
+/** A well-mixed unsigned 32-bit hash of a seed and a hex, for per-tile choices such as art variants. */
+export function hashHex(seed: number, q: number, r: number): number {
+  let h = toSeed(seed) ^ Math.imul(q | 0, 0x9e3779b1) ^ Math.imul(r | 0, 0x85ebca77);
+  h = Math.imul(h ^ (h >>> 16), 0x7feb352d);
+  h = Math.imul(h ^ (h >>> 15), 0x846ca68b);
+  return (h ^ (h >>> 16)) >>> 0;
+}
