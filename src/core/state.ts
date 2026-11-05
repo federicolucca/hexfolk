@@ -69,6 +69,9 @@ export type Action =
   | { type: 'capture'; unit: number }
   | { type: 'train'; city: number; unit: UnitType }
   | { type: 'harvest'; at: HexRef }
+  | { type: 'attack'; unit: number; target: HexRef }
+  | { type: 'research'; tech: TechId }
+  | { type: 'build_walls'; city: number }
   | { type: 'end_turn' };
 
 export type GameEvent =
@@ -76,6 +79,9 @@ export type GameEvent =
   | { type: 'captured'; unit: number; city: number; from: number | null }
   | { type: 'trained'; unit: number; city: number; unitType: UnitType }
   | { type: 'harvested'; at: HexRef; resource: Resource; city: number }
+  | { type: 'attacked'; unit: number; target: number; damage: number; counter: number; killed: boolean; attackerKilled: boolean }
+  | { type: 'researched'; player: number; tech: TechId }
+  | { type: 'walls_built'; city: number }
   | { type: 'city_grew'; city: number; level: number }
   | { type: 'income'; player: number; stars: number }
   | { type: 'eliminated'; player: number; by: number }

@@ -90,6 +90,8 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: Scene): void {
       const frame = name ? theme.atlas.frames[name] : undefined;
       const centre = hexToPixel(tile, metrics);
       if (frame) drawFrame(ctx, theme, hd, frame, centre);
+      const walls = city?.walls ? common.atlas.frames['overlays/walls'] : undefined;
+      if (walls) drawFrame(ctx, common, hd, walls, centre);
       const overlay = tile.resource && !city ? common.atlas.frames[`overlays/${tile.resource}`] : undefined;
       if (overlay) drawFrame(ctx, common, hd, overlay, { x: centre.x - 20, y: centre.y + 4 }, RESOURCE_SCALE);
     }

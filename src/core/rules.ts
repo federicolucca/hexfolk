@@ -51,3 +51,13 @@ export const LEVEL_POPULATION: readonly number[] = [0, 2, 5];
 export const MAX_LEVEL = LEVEL_POPULATION.length;
 /** A city supports up to level + this many units (its "home" units). */
 export const UNITS_PER_LEVEL_BONUS = 1;
+
+export const TECH_IDS: readonly TechId[] = ['hunting', 'fishing', 'riding', 'climbing', 'archery', 'fortification'];
+/** Stars to research any one tech. */
+export const TECH_COST = 4;
+/** Stars to build walls on a city (needs fortification). */
+export const WALLS_COST = 3;
+/** A unit defending on its own walled city defends this many times better. */
+export const WALLS_DEFENCE_BONUS = 2;
+/** Damage scale: a full-health warrior hitting an equal one deals 5 of 10 health. */
+export const DAMAGE_FACTOR = 4.5;

@@ -1,11 +1,12 @@
 // The headless engine. The browser UI, the AI, the simulator and the MCP server all play through
 // these four functions: newGame, observe, legalActions and step. Pure and deterministic.
-import { cityAt, sameHex, tileAtHex, unitById } from './board';
+import { cityAt, sameHex, tileAtHex, unitAt, unitById } from './board';
 import { income, levelFor, supportedUnits, territoryCity, unitCapacity } from './economy';
-import { neighbours } from './hex';
+import { previewAttack } from './combat';
+import { distance, neighbours } from './hex';
 import { generateMap } from './map';
 import { reachable } from './movement';
-import { DEFAULT_TURN_LIMIT, HARVEST_COST, RESOURCE_TECH, STARTING_STARS, UNIT_STATS, UNIT_TYPES } from './rules';
+import { DEFAULT_TURN_LIMIT, HARVEST_COST, RESOURCE_TECH, STARTING_STARS, TECH_COST, TECH_IDS, UNIT_STATS, UNIT_TYPES, WALLS_COST } from './rules';
 import type { Action, GameEvent, GameState, Player, Rejection, StepResult } from './state';
 
 export interface NewGameOptions {
@@ -108,6 +109,29 @@ export function checkAction(state: GameState, player: number, action: Action): s
       if ((me?.stars ?? 0) < HARVEST_COST) return `needs ${HARVEST_COST} stars`;
       return null;
     }
+    case 'attack': {
+      const unit = unitById(state, action.unit);
+      if (!unit || unit.owner !== player) return 'no such unit of yours';
+      if (unit.attacked) return 'this unit has already attacked';
+      const target = unitAt(state, action.target);
+      if (!target || target.owner === player) return 'no enemy unit there';
+      const d = distance(unit, target);
+      if (d < 1 || d > UNIT_STATS[unit.type].range) return 'out of range';
+      return null;
+    }
+    case 'research':
+      if (!TECH_IDS.includes(action.tech)) return 'unknown tech';
+      if (me?.techs.includes(action.tech)) return 'already researched';
+      if ((me?.stars ?? 0) < TECH_COST) return `needs ${TECH_COST} stars`;
+      return null;
+    case 'build_walls': {
+      const city = state.cities.find((c) => c.id === action.city);
+      if (!city || city.owner !== player) return 'no such city of yours';
+      if (!hasTech(me, 'fortification')) return 'walls need fortification';
+      if (city.walls) return 'this city already has walls';
+      if ((me?.stars ?? 0) < WALLS_COST) return `needs ${WALLS_COST} stars`;
+      return null;
+    }
     default:
       return 'unknown action';
   }
@@ -124,10 +148,13 @@ export function legalActions(state: GameState, player: number): Action[] {
     if (unit.owner !== player) continue;
     for (const to of reachable(state, unit)) actions.push({ type: 'move', unit: unit.id, to });
     legal({ type: 'capture', unit: unit.id });
+    for (const enemy of state.units) if (enemy.owner !== player) legal({ type: 'attack', unit: unit.id, target: { q: enemy.q, r: enemy.r } });
   }
+  for (const tech of TECH_IDS) legal({ type: 'research', tech });
   const harvestable = new Set<string>();
   for (const city of state.cities) {
     if (city.owner !== player) continue;
+    legal({ type: 'build_walls', city: city.id });
     for (const unit of UNIT_TYPES) legal({ type: 'train', city: city.id, unit });
     for (const hex of [city, ...neighbours(city)]) {
       const key = `${hex.q},${hex.r}`;
@@ -225,6 +252,33 @@ function apply(state: GameState, player: number, action: Action, events: GameEve
         city.level = level;
         events.push({ type: 'city_grew', city: city.id, level });
       }
+      return;
+    }
+    case 'attack': {
+      const unit = unitById(state, action.unit);
+      const target = unitAt(state, action.target);
+      if (!unit || !target) return;
+      const result = previewAttack(state, unit, target);
+      target.hp -= result.damage;
+      unit.hp -= result.counter;
+      unit.moved = true;
+      unit.attacked = true;
+      events.push({ type: 'attacked', unit: unit.id, target: target.id, damage: result.damage, counter: result.counter, killed: result.kills, attackerKilled: result.attackerDies });
+      state.units = state.units.filter((u) => u.hp > 0);
+      return;
+    }
+    case 'research':
+      if (!me) return;
+      me.stars -= TECH_COST;
+      me.techs.push(action.tech);
+      events.push({ type: 'researched', player, tech: action.tech });
+      return;
+    case 'build_walls': {
+      const city = state.cities.find((c) => c.id === action.city);
+      if (!city || !me) return;
+      me.stars -= WALLS_COST;
+      city.walls = true;
+      events.push({ type: 'walls_built', city: city.id });
       return;
     }
     case 'end_turn':

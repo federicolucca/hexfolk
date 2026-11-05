@@ -39,7 +39,7 @@ export class Session {
     return {
       selected: this.selectedHex,
       reach: mine.flatMap((a) => (a.type === 'move' ? [a.to] : [])),
-      targets: [],
+      targets: mine.flatMap((a) => (a.type === 'attack' ? [a.target] : [])),
       done,
     };
   }
@@ -48,6 +48,8 @@ export class Session {
   act(action: Action): GameEvent[] {
     const result = step(this.state, this.human, [action]);
     this.state = result.state;
+    // Drop the unit selection once it has nothing left to do.
+    if (this.selectedUnit !== null && this.unitActions(this.selectedUnit).length === 0) this.selectedUnit = null;
     return result.events;
   }
 
@@ -66,6 +68,11 @@ export class Session {
         this.selectedUnit = this.unitActions(this.selectedUnit).length > 0 ? this.selectedUnit : null;
         return events;
       }
+    }
+    if (this.selectedUnit !== null && this.unitActions(this.selectedUnit).some((a) => a.type === 'attack' && same(a.target, hex))) {
+      // Select the enemy but keep the attacker: the panel then offers the attack with its preview.
+      this.selectedHex = hex;
+      return [];
     }
     if (this.selectedHex && same(this.selectedHex, hex)) {
       this.clearSelection();

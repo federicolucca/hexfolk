@@ -21,7 +21,7 @@ import { attachInput } from './render/input';
 import { type Bounds, hexToPixel, mapBounds, pixelToHex } from './render/layout';
 import { drawScene, wantsHd } from './render/renderer';
 import { describeHex, playerName, starsLine, turnLine } from './ui/describe';
-import { panelFor } from './ui/panels';
+import { panelFor, techPanel } from './ui/panels';
 import { applyPalette, createHud } from './ui/hud';
 import { Session } from './ui/session';
 import { parsePlayers, parseSeed, parseTheme, randomSeed, withParams } from './ui/url';
@@ -53,6 +53,7 @@ async function start(app: HTMLElement): Promise<void> {
   let frame = 0;
   let loadToken = 0;
   let busy = false;
+  let showTechs = false;
 
   function createSession(s: number): Session {
     const agents = Object.fromEntries(Array.from({ length: players }, (_, i) => [i, passAgent]));
@@ -86,7 +87,17 @@ async function start(app: HTMLElement): Promise<void> {
     const waiting = `${playerName(state.current)} is playing…`;
     hud.setInfo(info?.title ?? (session.humanToMove ? 'Your turn' : waiting), info?.detail ?? (session.humanToMove ? 'Tap a unit or a city' : ''));
     hud.setEndTurn(session.humanToMove && !busy);
-    const panel = session.selectedHex && !busy ? panelFor(state, HUMAN, session.selectedHex) : null;
+    hud.setTools([
+      {
+        label: 'Techs',
+        active: showTechs,
+        onClick: () => {
+          showTechs = !showTechs;
+          refresh();
+        },
+      },
+    ]);
+    const panel = busy || !session.humanToMove ? null : showTechs ? techPanel(state, HUMAN) : session.selectedHex ? panelFor(state, HUMAN, session.selectedHex, session.selectedUnit) : null;
     hud.setPanel(
       panel?.title ?? null,
       panel?.cards.map((c) => ({
@@ -94,9 +105,11 @@ async function start(app: HTMLElement): Promise<void> {
         label: c.label,
         detail: c.detail,
         enabled: c.action !== undefined,
+        ...(c.owned ? { owned: true } : {}),
         onClick: () => {
           if (!c.action || busy) return;
           session.act(c.action);
+          if (c.action.type === 'attack') session.clearSelection();
           refresh();
         },
       })),
@@ -185,6 +198,7 @@ async function start(app: HTMLElement): Promise<void> {
 
   const onTap = (hex: HexRef): void => {
     if (busy) return;
+    showTechs = false;
     session.tap(hex);
     refresh();
   };

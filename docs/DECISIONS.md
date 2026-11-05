@@ -173,3 +173,13 @@ Choices made where the brief changed or was ambiguous. Newest first.
   - Licence and attribution are in `CREDITS.md` and `LICENSES/`.
 - **Open point:** the pack has terrain, buildings (blue, green, red, yellow, neutral) and props,
   but no characters. Units will be drawn as vector tokens, unless the owner picks a character pack.
+
+## Milestones (c) and (d): economy, techs and combat
+
+- Techs cost 4★ each, walls 3★ (needs Fortification), harvesting 2★ for +1 population.
+- Combat is Polytopia's formula with health-scaled forces and a factor of 4.5. A defender that survives
+  counter-attacks only if the attacker is within its range, so archers at range 2 take no counter from melee units.
+- Walls double the defence of a unit standing on its own walled city. A captured city keeps its walls.
+- A melee attacker does not move into the hex of a unit it kills. A unit can move and then attack, but not attack and then move.
+- Capturing needs a unit that began its turn on the city (it does not move or attack that turn).
+- No terrain defence bonus and no healing between turns, to keep the rules minimal.
