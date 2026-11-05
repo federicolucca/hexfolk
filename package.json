@@ -1,0 +1,23 @@
+{
+  "name": "hexfolk",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A minimal turn-based 4X strategy game on a hex map, for desktop and mobile browsers.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "sprites": "node scripts/render-sprites.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  }
+}
