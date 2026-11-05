@@ -4,6 +4,9 @@ coverage/
 *.log
 .DS_Store
 
-# Third-party 3D sources: fetch with scripts/fetch-assets.sh. Only the derived sprites are committed.
-assets-src/
+# Generator output before cropping (large); only the final tiles are committed.
+*.raw.png
+# Built from assets/raw/tiles by `npm run atlas` (prebuild).
+public/atlas/
 .serena/
+.venv/

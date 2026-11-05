@@ -1,0 +1,126 @@
+{
+ "greenlands": {
+  "forest": [
+   "forest_1.png",
+   "forest_2.png",
+   "forest_3.png"
+  ],
+  "grass": [
+   "grass_1.png",
+   "grass_2.png",
+   "grass_3.png"
+  ],
+  "mountain": [
+   "mountain_1.png"
+  ],
+  "hill": [
+   "hill_1.png",
+   "hill_2.png"
+  ],
+  "water": [
+   "water_1.png"
+  ],
+  "village": [
+   "village_1.png"
+  ],
+  "capital": [
+   "capital_1.png"
+  ],
+  "ruins": [
+   "ruins_1.png"
+  ]
+ },
+ "drylands": {
+  "grass": [
+   "grass_1.png",
+   "grass_2.png",
+   "grass_3.png"
+  ],
+  "forest": [
+   "forest_1.png",
+   "forest_2.png",
+   "forest_3.png"
+  ],
+  "mountain": [
+   "mountain_1.png"
+  ],
+  "hill": [
+   "hill_1.png",
+   "hill_2.png"
+  ],
+  "water": [
+   "water_1.png"
+  ],
+  "village": [
+   "village_1.png"
+  ],
+  "capital": [
+   "capital_1.png"
+  ],
+  "ruins": [
+   "ruins_1.png"
+  ]
+ },
+ "icelands": {
+  "grass": [
+   "grass_1.png",
+   "grass_2.png",
+   "grass_3.png"
+  ],
+  "forest": [
+   "forest_1.png",
+   "forest_2.png",
+   "forest_3.png"
+  ],
+  "mountain": [
+   "mountain_1.png"
+  ],
+  "hill": [
+   "hill_1.png",
+   "hill_2.png"
+  ],
+  "water": [
+   "water_1.png"
+  ],
+  "village": [
+   "village_1.png"
+  ],
+  "capital": [
+   "capital_1.png"
+  ],
+  "ruins": [
+   "ruins_1.png"
+  ]
+ },
+ "deadlands": {
+  "grass": [
+   "grass_1.png",
+   "grass_2.png",
+   "grass_3.png"
+  ],
+  "forest": [
+   "forest_1.png",
+   "forest_2.png",
+   "forest_3.png"
+  ],
+  "mountain": [
+   "mountain_1.png"
+  ],
+  "hill": [
+   "hill_1.png",
+   "hill_2.png"
+  ],
+  "water": [
+   "water_1.png"
+  ],
+  "village": [
+   "village_1.png"
+  ],
+  "capital": [
+   "capital_1.png"
+  ],
+  "ruins": [
+   "ruins_1.png"
+  ]
+ }
+}
