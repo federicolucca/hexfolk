@@ -28,6 +28,12 @@
   ],
   "ruins": [
    "ruins_1.png"
+  ],
+  "city_2": [
+   "city_2_1.png"
+  ],
+  "city_3": [
+   "city_3_1.png"
   ]
  },
  "drylands": {
@@ -59,6 +65,12 @@
   ],
   "ruins": [
    "ruins_1.png"
+  ],
+  "city_2": [
+   "city_2_1.png"
+  ],
+  "city_3": [
+   "city_3_1.png"
   ]
  },
  "icelands": {
@@ -90,6 +102,12 @@
   ],
   "ruins": [
    "ruins_1.png"
+  ],
+  "city_2": [
+   "city_2_1.png"
+  ],
+  "city_3": [
+   "city_3_1.png"
   ]
  },
  "deadlands": {
@@ -121,6 +139,12 @@
   ],
   "ruins": [
    "ruins_1.png"
+  ],
+  "city_2": [
+   "city_2_1.png"
+  ],
+  "city_3": [
+   "city_3_1.png"
   ]
  }
 }
