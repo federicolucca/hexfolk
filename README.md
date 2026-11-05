@@ -111,5 +111,9 @@ Tile art: original, generated for hexfolk with Gemini from the author's prompts
 
 ## Licence
 
-Code: MIT (see [LICENSE](LICENSE)). The licence for the tile art is not decided yet. hexfolk's
-names and rules are original.
+Code: MIT (see [LICENSE](LICENSE)).
+
+Art (`assets/` and the generated `public/atlas`): [CC BY 4.0](LICENSE-ART), © 2026 Federico Lucca,
+generated with Gemini from his prompts. Please credit "hexfolk art by Federico Lucca" if you reuse it.
+
+hexfolk's names and rules are original.

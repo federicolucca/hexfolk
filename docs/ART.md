@@ -4,6 +4,9 @@ All the art is generated with Gemini from the author's prompts. Every prompt liv
 [`scripts/gen_tiles_gemini.py`](../scripts/gen_tiles_gemini.py), so any image can be regenerated
 with the same words. Change them there and commit.
 
+Licence: the art (`assets/` and the atlas built from it) is CC BY 4.0, © 2026 Federico Lucca, see
+[`LICENSE-ART`](../LICENSE-ART). The code is MIT.
+
 | Category | Output | Prompt parts |
 | --- | --- | --- |
 | Hex tiles | `assets/raw/tiles/<theme>/<terrain>_<n>.png` + `manifest.json` | `STYLE`, `TERRAINS`, `TERRAIN_OVERRIDES`, `PALETTES`, `VARIANTS_DEFAULT` |

@@ -1,0 +1,16 @@
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+Copyright (c) 2026 Federico Lucca
+
+Scope: the artwork in assets/ (raw tiles, units, icons, overlays) and the atlas
+built from it (public/atlas, produced by `npm run atlas`). The images were
+generated with Google Gemini from prompts written by Federico Lucca (see
+docs/ART.md and scripts/gen_tiles_gemini.py).
+
+You are free to share and adapt this artwork for any purpose, even commercially,
+provided you give appropriate credit (for example "hexfolk art by Federico Lucca,
+CC BY 4.0"), link to the licence, and indicate if changes were made.
+
+Full legal text: https://creativecommons.org/licenses/by/4.0/legalcode
+
+The source code is NOT covered by this licence; it is MIT, see LICENSE.

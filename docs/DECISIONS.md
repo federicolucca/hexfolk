@@ -2,6 +2,11 @@
 
 Choices made where the brief changed or was ambiguous. Newest first.
 
+## 2026-11-05: Licences
+
+- Code stays MIT (`LICENSE`). The art in `assets/` and the generated `public/atlas` is CC BY 4.0,
+  © 2026 Federico Lucca (`LICENSE-ART`), generated with Gemini from his prompts. Decided by the owner.
+
 ## 2026-11-05: Engine API, units and movement (milestone b)
 
 - **Engine:** one pure API (`newGame`, `observe`, `legalActions`, `step` in `src/core/engine.ts`)
