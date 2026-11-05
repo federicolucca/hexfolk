@@ -1,0 +1,32 @@
+// URL parameters: pure parsing, no DOM.
+import { MAX_PLAYERS, MIN_PLAYERS } from '../core/map';
+
+export const DEFAULT_PLAYERS = 4;
+const MAX_SEED = 0xffffffff;
+
+/** ?seed= as an unsigned 32-bit integer, or undefined when absent or invalid. */
+export function parseSeed(search: string): number | undefined {
+  const raw = new URLSearchParams(search).get('seed')?.trim();
+  if (!raw || !/^\d{1,10}$/.test(raw)) return undefined;
+  const seed = Number(raw);
+  return seed <= MAX_SEED ? seed : undefined;
+}
+
+/** ?players= from 2 to 4, or the default. */
+export function parsePlayers(search: string): number {
+  const raw = new URLSearchParams(search).get('players');
+  const players = raw === null ? NaN : Number(raw);
+  return Number.isInteger(players) && players >= MIN_PLAYERS && players <= MAX_PLAYERS ? players : DEFAULT_PLAYERS;
+}
+
+/** A random seed from a [0, 1) source (Math.random by default). */
+export function randomSeed(random: () => number = Math.random): number {
+  return Math.floor(random() * (MAX_SEED + 1)) >>> 0;
+}
+
+/** The same search string with ?seed= set, keeping other parameters. */
+export function withSeed(search: string, seed: number): string {
+  const params = new URLSearchParams(search);
+  params.set('seed', String(seed));
+  return `?${params.toString()}`;
+}

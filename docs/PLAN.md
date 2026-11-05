@@ -109,15 +109,18 @@ function legalActions(state: GameState): Action[];
 | `core/state.ts` | planned | `GameState`, `applyAction`, `legalActions`, victory and score |
 | `core/ai.ts` | planned | greedy heuristic opponent, under 100 ms per turn |
 | `core/save.ts` | planned | versioned autosave to and from JSON |
-| `render/palette.ts` | next | every colour used by the canvas and the HUD |
-| `render/layout.ts` | next | hex to pixel and pixel to hex for the sprite projection |
-| `render/camera.ts` | next | pan, zoom around a point, clamping, world to screen |
-| `render/sprites.ts` | next | loads `sprites/manifest.json` and the PNGs, picks a sprite per tile |
-| `render/renderer.ts` | next | draws the map back to front, HiDPI, selection highlight |
-| `render/input.ts` | next | pointer and wheel gestures: tap, drag, pinch, wheel zoom |
+| `render/palette.ts` | done | every colour used by the canvas and the HUD |
+| `render/layout.ts` | done | hex to pixel and pixel to hex for the sprite projection |
+| `render/camera.ts` | done | pan, zoom around a point, clamping, world to screen |
+| `render/sprites.ts` | done | loads `sprites/manifest.json` and the PNGs |
+| `render/spriteMap.ts` | done | which sprite each tile uses, manifest validation |
+| `render/gesture.ts` | done | tap-or-drag threshold, pinch and wheel maths |
+| `render/renderer.ts` | done | draws the map back to front, HiDPI, selection highlight |
+| `render/input.ts` | done | pointer and wheel gestures: tap, drag, pinch, wheel zoom |
 | `render/units.ts` | planned | unit tokens (vector, the art pack has no characters) |
-| `ui/hud.ts` | next | seed, New map button, selected tile |
-| `ui/url.ts` | next | `?seed=` and `?players=` parsing |
+| `ui/hud.ts` | done | seed, New map button, selected tile |
+| `ui/url.ts` | done | `?seed=` and `?players=` parsing |
+| `ui/describe.ts` | done | text for the selected tile |
 
 ## Milestones
 

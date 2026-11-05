@@ -2,6 +2,29 @@
 
 Choices made where the brief changed or was ambiguous. Newest first.
 
+## 2026-11-05: Map rendering and deploy
+
+- **Projection:** a hex's world position is the centre of its top face in sprite pixels:
+  `x = 256 * (q + r / 2)`, `y = 142.51 * r`. That is the regular pointy-top layout squashed
+  vertically (an affine map), so pixel-to-hex inverts it and cube-rounds. A tap selects the hex
+  whose top face is under the finger, even when a tall sprite from the row in front covers it.
+- **Draw order:** tiles are row-major, so they are drawn in array order (back to front). The
+  selection outline is drawn right after its row, so trees and buildings in front still cover it.
+- **Camera:** an orthographic centre point plus zoom, at most 1.25 (sprites are 256 px per tile, so
+  further zoom only blurs them). The minimum zoom is 75% of the whole-map fit, and the view centre
+  is kept over the map. The canvas uses the device pixel ratio, capped at 2.
+- **Starting view:** the geometric mean of the width fit and the height fit. On a desktop this is
+  about the whole map; on a portrait phone the whole 11x11 map would be tiny, so it starts zoomed
+  in about 2x and you pan to see the rest.
+- **Gestures:** a press that moves more than 8 CSS px is a drag and never a tap; a gesture that
+  used two fingers is never a tap either. Wheel zoom follows the cursor; pinch zooms around the
+  midpoint of the fingers and pans with it.
+- **URL:** `?seed=` (0 to 4294967295) picks the map; without it a random seed is chosen and written
+  into the URL, so the address bar always holds a shareable link. `?players=2..4` (default 4) sets
+  the number of capitals. "New map" picks a random seed and replaces the URL.
+- **Deploy:** GitHub Actions on every push to main runs `npm ci`, `npm test` and `npm run build`,
+  then publishes `dist/` with `actions/upload-pages-artifact` and `actions/deploy-pages`.
+
 ## 2026-11-05: Sprite pre-rendering (camera, lighting, model mapping)
 
 - **Tool:** `npm run sprites` (`scripts/render-sprites.mjs`) serves the glTF sources and three.js to

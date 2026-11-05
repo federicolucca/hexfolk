@@ -42,3 +42,18 @@ export function offsetToAxial(col: number, row: number): Hex {
 export function axialToOffset(hex: Hex): { col: number; row: number } {
   return { col: hex.q + (hex.r - (hex.r & 1)) / 2, row: hex.r };
 }
+
+/** Rounds fractional axial coordinates to the hex that contains them (cube rounding). */
+export function roundHex(q: number, r: number): Hex {
+  const s = -q - r;
+  let rq = Math.round(q);
+  let rr = Math.round(r);
+  const rs = Math.round(s);
+  const dq = Math.abs(rq - q);
+  const dr = Math.abs(rr - r);
+  const ds = Math.abs(rs - s);
+  if (dq > dr && dq > ds) rq = -rr - rs;
+  else if (dr > ds) rr = -rq - rs;
+  // + 0 turns -0 into 0, so results compare cleanly.
+  return { q: rq + 0, r: rr + 0 };
+}

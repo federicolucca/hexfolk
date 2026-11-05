@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { axialToOffset, distance, neighbours, offsetToAxial, sameHex } from '../src/core/hex';
+import { axialToOffset, distance, neighbours, offsetToAxial, roundHex, sameHex } from '../src/core/hex';
 
 describe('hex helpers', () => {
   it('lists six distinct neighbours, each at distance 1', () => {
@@ -53,5 +53,25 @@ describe('hex helpers', () => {
     ];
     expect(ns).toHaveLength(6);
     for (const e of expected) expect(ns).toContainEqual(e);
+  });
+});
+
+describe('roundHex', () => {
+  it('returns the hex itself for whole coordinates', () => {
+    expect(roundHex(3, -2)).toEqual({ q: 3, r: -2 });
+    expect(roundHex(0, 0)).toEqual({ q: 0, r: 0 });
+  });
+
+  it('rounds points inside a hex to that hex', () => {
+    expect(roundHex(0.3, 0.1)).toEqual({ q: 0, r: 0 });
+    expect(roundHex(0.9, -0.2)).toEqual({ q: 1, r: 0 });
+    expect(roundHex(-0.1, -0.35)).toEqual({ q: 0, r: 0 });
+    expect(roundHex(2.2, -1.1)).toEqual({ q: 2, r: -1 });
+  });
+
+  it('keeps the cube constraint when q and r round the wrong way', () => {
+    // q = 0.45 and r = 0.45 both round down, but s = -0.9 is far from 0: the hex is (0, 1) or (1, 0).
+    const h = roundHex(0.45, 0.45);
+    expect(distance(h, { q: 0, r: 0 })).toBe(1);
   });
 });

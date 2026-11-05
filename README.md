@@ -4,9 +4,11 @@ A minimal turn-based 4X strategy game on a hex map, playable in desktop and mobi
 Explore, expand, exploit and exterminate on a small procedurally generated island, against AI rivals,
 in under 30 turns.
 
-> **Status: planning.** No code yet. This README describes what v0.1 will be.
+> **Status: map milestone.** A seeded island you can pan, zoom and inspect. Units and rules come
+> next; this README describes what v0.1 will be.
 
-**Demo:** https://federicolucca.github.io/hexfolk/ (available from the first deploy)
+**Demo:** https://federicolucca.github.io/hexfolk/ (add `?seed=123` for a given map, `&players=2` for
+fewer capitals)
 
 ## What it is
 
@@ -69,8 +71,6 @@ pinned to a fixed upstream commit, into `assets-src/` (gitignored). You only nee
 re-render the sprites.
 
 ## Running locally
-
-These commands will work once the first milestone lands:
 
 ```sh
 npm install

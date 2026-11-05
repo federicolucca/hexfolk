@@ -1,0 +1,113 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--hf-bg);
+  color: var(--hf-text);
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+.hf-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+
+.hf-canvas:active {
+  cursor: grabbing;
+}
+
+.hf-bar,
+.hf-info {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 24px);
+  padding: 8px 8px 8px 16px;
+  border: 1px solid var(--hf-border);
+  border-radius: 14px;
+  background: var(--hf-panel);
+  backdrop-filter: blur(6px);
+  font-size: 15px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.hf-bar {
+  top: max(12px, env(safe-area-inset-top));
+}
+
+.hf-info {
+  bottom: max(12px, env(safe-area-inset-bottom));
+  padding: 10px 16px;
+}
+
+.hf-info[hidden],
+.hf-message[hidden] {
+  display: none;
+}
+
+.hf-title {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.hf-seed {
+  color: var(--hf-muted);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hf-button {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--hf-accent);
+  color: var(--hf-accent-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hf-button:hover {
+  background: var(--hf-accent-hover);
+}
+
+.hf-button:focus-visible {
+  outline: 2px solid var(--hf-text);
+  outline-offset: 2px;
+}
+
+.hf-message {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--hf-muted);
+  text-align: center;
+  pointer-events: none;
+}
