@@ -339,3 +339,18 @@ describe('greedy AI', () => {
     expect(connectedCities(next, 0).has(2)).toBe(true);
   });
 });
+
+describe('autosave', () => {
+  it('ignores a save from before v0.2 (no dice state)', async () => {
+    const { loadGame, saveGame } = await import('../src/ui/save');
+    const data = new Map<string, string>();
+    const store = { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v), removeItem: (k: string) => void data.delete(k) };
+    const state = newGame({ seed: 2, players: 2 });
+    saveGame(store, state);
+    expect(loadGame(store)?.rollState).toBe(state.rollState);
+    const old = { ...state } as Partial<GameState>;
+    delete old.rollState;
+    store.setItem('hexfolk:save', JSON.stringify(old));
+    expect(loadGame(store)).toBeNull();
+  });
+});

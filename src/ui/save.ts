@@ -23,6 +23,8 @@ export function loadGame(store: Store | undefined): GameState | null {
     const s = JSON.parse(raw) as Partial<GameState>;
     const ok =
       s.version === 1 &&
+      // Saves from before economy v0.2 have no dice state and old resource names: start fresh.
+      typeof s.rollState === 'number' &&
       Array.isArray(s.tiles) &&
       s.tiles.length === (s.width ?? 0) * (s.height ?? 0) &&
       Array.isArray(s.players) &&
