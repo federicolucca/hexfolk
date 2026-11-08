@@ -55,7 +55,7 @@ Choices made where the brief changed or was ambiguous. Newest first.
   in the browser player 0 is the human and the others are agents.
 - **Unit stats** (attack / defence / movement / range / health / cost / tech): warrior 2/2/1/1/10/2
   (none), archer 2/1/1/2/10/3 (Archery), rider 2/1/2/1/10/3 (Riding), defender 1/3/1/1/15/3
-  (Fortification). Simplest Polytopia-like values.
+  (Fortification). Simplest plain values.
 - **Movement:** grass costs 1 point; entering a forest or a mountain ends the move (the simplest
   "terrain cost" that still matters for a 1-move unit); water is impassable (no boats in v0.1);
   mountains need Climbing. Units never share or pass through a hex. No zones of control.
@@ -218,7 +218,7 @@ Choices made where the brief changed or was ambiguous. Newest first.
 ## Milestones (c) and (d): economy, techs and combat
 
 - Techs cost 4★ each, walls 3★ (needs Fortification), harvesting 2★ for +1 population.
-- Combat is Polytopia's formula with health-scaled forces and a factor of 4.5. A defender that survives
+- Combat uses the ratio of the two forces, health-scaled, with health-scaled forces and a factor of 4.5. A defender that survives
   counter-attacks only if the attacker is within its range, so archers at range 2 take no counter from melee units.
 - Walls double the defence of a unit standing on its own walled city. A captured city keeps its walls.
 - A melee attacker does not move into the hex of a unit it kills. A unit can move and then attack, but not attack and then move.
