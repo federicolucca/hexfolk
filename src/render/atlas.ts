@@ -24,14 +24,14 @@ export interface Atlas {
   variants: Record<string, string[]>;
 }
 
-/** The common atlas: units, resource overlays, the walls ring and HUD icons. */
+/** The common atlas: units, the fish and walls overlays (the other resources are drawn in code) and HUD icons. */
 export interface CommonAtlas {
   images: { '1': string; '2': string };
   frames: Record<string, AtlasFrame>;
 }
 
-/** The art terrains a map needs. Hill and ruins are in the atlas but not in the rules. */
-export const REQUIRED_TERRAINS = ['grass', 'forest', 'mountain', 'water', 'village', 'city_2', 'city_3', 'capital'] as const;
+/** The art terrains a map needs. Ruins are in the atlas but not in the rules. */
+export const REQUIRED_TERRAINS = ['grass', 'forest', 'hill', 'mountain', 'water', 'village', 'city_2', 'city_3', 'capital'] as const;
 
 /** Sprite colour names, by player id. */
 export const PLAYER_COLOURS = ['blue', 'red', 'yellow', 'green'] as const;
@@ -100,7 +100,7 @@ export function requiredCommonFrames(): string[] {
   for (const type of ['warrior', 'archer', 'rider', 'defender']) {
     for (const colour of PLAYER_COLOURS) names.push(`units/${type}_${colour}`);
   }
-  for (const o of ['fruit', 'game', 'fish', 'ore', 'walls']) names.push(`overlays/${o}`);
+  for (const o of ['fish', 'walls']) names.push(`overlays/${o}`);
   for (const i of ['star', 'hunting', 'fishing', 'riding', 'climbing', 'archery', 'fortification']) names.push(`icons/${i}`);
   return names;
 }

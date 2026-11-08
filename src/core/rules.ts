@@ -7,7 +7,7 @@ export type TechId = 'hunting' | 'fishing' | 'riding' | 'climbing' | 'archery' |
 export interface UnitStats {
   attack: number;
   defence: number;
-  /** Movement points per turn. Grass costs 1; entering a forest or mountain ends the move. */
+  /** Movement points per turn. Grass costs 1; entering a forest, hill or mountain ends the move. Between two road tiles a step costs half. */
   movement: number;
   /** Attack range in hexes (1 = adjacent). */
   range: number;
@@ -40,11 +40,22 @@ export const CAPITAL_BONUS_INCOME = 1;
 /** Harvesting a resource next to one of your cities costs this and adds 1 population. */
 export const HARVEST_COST = 2;
 export const RESOURCE_TECH: Readonly<Record<Resource, TechId | null>> = {
-  fruit: null,
-  game: 'hunting',
+  grain: null,
+  wood: null,
+  sheep: 'hunting',
+  stone: 'climbing',
   fish: 'fishing',
-  ore: 'climbing',
 };
+
+/** A city that has harvested at least this many distinct resource kinds earns the variety bonus per turn. */
+export const VARIETY_KINDS = 3;
+export const VARIETY_BONUS = 1;
+/** Stars to build one road tile (no tech). */
+export const ROAD_COST = 2;
+/** A city linked to its owner's capital by road earns this per turn. */
+export const TRADE_ROUTE_BONUS = 1;
+/** A harvested tile pays its owner this when the round's dice roll matches its token. */
+export const TOKEN_PAYOUT = 1;
 
 /** Total population needed for each city level (index 0 = level 1). */
 export const LEVEL_POPULATION: readonly number[] = [0, 2, 5];

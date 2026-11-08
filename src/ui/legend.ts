@@ -1,6 +1,8 @@
 // The Legend drawer: every sprite in the atlases with a short label, drawn from the atlas JSON.
 import type { Theme } from '../core/theme';
+import { RESOURCES } from '../core/map';
 import type { AtlasFrame } from '../render/atlas';
+import { drawResource, drawRoad, drawToken } from '../render/resources';
 import './legend.css';
 
 interface AtlasFile {
@@ -17,6 +19,8 @@ interface Entry {
   frame: string;
   label: string;
   note?: string;
+  /** Placeholder art drawn in code: used instead of an atlas frame. Draws centred in a box of `size` px. */
+  draw?: (ctx: CanvasRenderingContext2D, size: number) => void;
 }
 
 const THUMB = 52;
@@ -34,10 +38,11 @@ const LABELS: Record<string, string> = {
   city_3: 'City (level 3)',
   capital: 'Capital',
   walls: 'City walls',
-  fruit: 'Fruit',
-  game: 'Game',
+  grain: 'Grain',
+  sheep: 'Sheep',
+  wood: 'Wood',
+  stone: 'Stone',
   fish: 'Fish',
-  ore: 'Ore',
   star: 'Star (currency)',
   hunting: 'Hunting',
   fishing: 'Fishing',
@@ -52,7 +57,7 @@ const LABELS: Record<string, string> = {
 };
 
 /** Which terrain a resource sits on. */
-const RESOURCE_TERRAIN: Record<string, string> = { fruit: 'Grass', game: 'Forest', fish: 'Water', ore: 'Mountain' };
+const RESOURCE_NOTE: Record<string, string> = { grain: 'on grass', sheep: 'on hills', wood: 'in forest', stone: 'on hills and mountains', fish: 'on water' };
 const CITY_KEYS = ['village', 'city_2', 'city_3', 'capital'];
 const COLOURS = ['red', 'blue', 'green', 'yellow'];
 
@@ -131,7 +136,12 @@ export function createLegend(container: HTMLElement, baseUrl: string): Legend {
     canvas.height = THUMB * ratio;
     canvas.setAttribute('role', 'img');
     canvas.setAttribute('aria-label', entry.label);
-    if (f) {
+    if (entry.draw) {
+      const ctx = canvas.getContext('2d');
+      ctx?.scale(ratio, ratio);
+      ctx?.translate(THUMB / 2, THUMB / 2);
+      if (ctx) entry.draw(ctx, THUMB);
+    } else if (f) {
       loadImage(`${baseUrl}${atlas.images[hd && ratio === 2 ? '2' : '1']}`)
         .then((image) => {
           const k = hd && ratio === 2 ? 2 : 1;
@@ -203,10 +213,13 @@ export function createLegend(container: HTMLElement, baseUrl: string): Legend {
       const units = ['warrior', 'archer', 'rider', 'defender'].flatMap((u) =>
         COLOURS.map((c) => ({ frame: `units/${u}_${c}`, label: `${label(u)} (${c})` })),
       );
-      const resources = folder(common, 'overlays/')
-        .map((n) => n.slice('overlays/'.length))
-        .filter((k) => k in RESOURCE_TERRAIN)
-        .map((k) => ({ frame: `overlays/${k}`, label: label(k), note: `on ${RESOURCE_TERRAIN[k]}` }));
+      // Resources, tokens and roads are drawn in code (placeholders): see src/render/resources.ts.
+      const resources: Entry[] = [
+        ...RESOURCES.map((k) => ({ frame: `resource/${k}`, label: label(k), note: RESOURCE_NOTE[k] ?? "", draw: (ctx: CanvasRenderingContext2D, size: number) => drawResource(ctx, k, 0, 0, size * 0.7) })),
+        { frame: 'token', label: 'Number token', note: 'rolled on 2d6 each round', draw: (ctx, size) => drawToken(ctx, 8, 0, 0, size * 0.34, false) },
+        { frame: 'token_paying', label: 'Harvested token', note: '+1 star when rolled', draw: (ctx, size) => drawToken(ctx, 5, 0, 0, size * 0.34, true) },
+        { frame: 'road', label: 'Road', note: 'half-cost moves, trade routes', draw: (ctx, size) => drawRoad(ctx, { x: -size * 0.3, y: 0 }, [{ x: size * 1.5, y: 0 }], 6) },
+      ];
       const icons = folder(common, 'icons/').map((n) => ({ frame: n, label: label(n.slice('icons/'.length)) }));
       fixed.replaceChildren(
         section('Units', common, units.filter((u) => common.frames[u.frame]), 'hf-legend-units'),

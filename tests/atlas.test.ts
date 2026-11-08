@@ -60,18 +60,18 @@ describe('frameName', () => {
   const game = newGame({ seed: 3846861248, players: 4 });
   const map = { seed: game.seed, tiles: game.tiles };
   const cityAt = (q: number, r: number) => game.cities.find((c) => c.q === q && c.r === r);
-  const city = (fields: Partial<City>): City => ({ id: 0, q: 0, r: 0, owner: null, capital: false, level: 1, population: 0, walls: false, ...fields });
+  const city = (fields: Partial<City>): City => ({ id: 0, q: 0, r: 0, owner: null, capital: false, level: 1, population: 0, walls: false, harvested: [], ...fields });
 
   it('maps terrains and cities to their art', () => {
-    const grass = { q: 0, r: 0, terrain: 'grass' as const, resource: null };
+    const grass = { q: 0, r: 0, terrain: 'grass' as const, resource: null, token: null, harvested: null, road: false };
     expect(artTerrain(grass, undefined)).toBe('grass');
     expect(artTerrain(grass, city({ capital: true, owner: 2 }))).toBe('capital');
     expect(artTerrain(grass, city({}))).toBe('village');
     expect(artTerrain(grass, city({ owner: 1, level: 2 }))).toBe('city_2');
     expect(artTerrain(grass, city({ owner: 1, level: 5 }))).toBe('city_3');
     expect(artTerrain(grass, city({ capital: true, owner: 0, level: 3 }))).toBe('capital');
-    expect(frameName(atlas, 1, { q: 0, r: 0, terrain: 'mountain', resource: null }, undefined)).toBe('mountain_1');
-    expect(frameName(atlas, 1, { q: 0, r: 0, terrain: 'water', resource: null }, undefined)).toBe('water_1');
+    expect(frameName(atlas, 1, { q: 0, r: 0, terrain: 'mountain', resource: null, token: null, harvested: null, road: false }, undefined)).toBe('mountain_1');
+    expect(frameName(atlas, 1, { q: 0, r: 0, terrain: 'water', resource: null, token: null, harvested: null, road: false }, undefined)).toBe('water_1');
   });
 
   it('finds a frame for every tile of a generated map', () => {
@@ -85,8 +85,8 @@ describe('frameName', () => {
     expect(new Set(names)).toEqual(new Set(['grass_1', 'grass_2', 'grass_3']));
   });
 
-  it('never uses hill or ruins for game terrains', () => {
-    for (const tile of map.tiles) expect(frameName(atlas, map.seed, tile, cityAt(tile.q, tile.r))).not.toMatch(/hill|ruins/);
+  it('never uses ruins for game terrains', () => {
+    for (const tile of map.tiles) expect(frameName(atlas, map.seed, tile, cityAt(tile.q, tile.r))).not.toMatch(/ruins/);
   });
 });
 

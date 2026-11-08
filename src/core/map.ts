@@ -1,22 +1,35 @@
 import { axialToOffset, distance, type Hex, neighbours, offsetToAxial } from './hex';
 import { createRng, type Rng, toSeed } from './rng';
 
-export type Terrain = 'grass' | 'forest' | 'mountain' | 'water';
-/** Harvestable resources; each lives on one terrain (fruit on grass, game in forest...). */
-export type Resource = 'fruit' | 'game' | 'fish' | 'ore';
+export type Terrain = 'grass' | 'forest' | 'hill' | 'mountain' | 'water';
+/** Harvestable resources: grain on grass, wood in forest, sheep or stone on hills, stone on mountains, fish on water. */
+export type Resource = 'grain' | 'sheep' | 'wood' | 'stone' | 'fish';
+export const RESOURCES: readonly Resource[] = ['grain', 'sheep', 'wood', 'stone', 'fish'];
 
-export const RESOURCE_TERRAIN: Readonly<Record<Resource, Terrain>> = {
-  fruit: 'grass',
-  game: 'forest',
-  fish: 'water',
-  ore: 'mountain',
+/** Terrains a resource can sit on. */
+export const RESOURCE_TERRAIN: Readonly<Record<Resource, readonly Terrain[]>> = {
+  grain: ['grass'],
+  sheep: ['hill'],
+  wood: ['forest'],
+  stone: ['hill', 'mountain'],
+  fish: ['water'],
 };
+
+/** Number tokens: 2 to 12 without 7, like the two-dice roll that pays them. */
+export const TOKEN_VALUES: readonly number[] = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12];
 
 export interface Tile {
   q: number;
   r: number;
   terrain: Terrain;
+  /** A resource still waiting to be harvested. */
   resource: Resource | null;
+  /** Set at map generation on every tile that holds a resource (2 to 12, never 7); it stays after harvest. */
+  token: number | null;
+  /** The resource that was harvested here, once it has been; such a tile pays out when its token is rolled. */
+  harvested: Resource | null;
+  /** A road built on this tile. */
+  road: boolean;
 }
 
 export type CityKind = 'capital' | 'village';
@@ -51,7 +64,8 @@ export const MIN_VILLAGE_DISTANCE = 2;
 
 const LAND_SHARE = 0.6;
 const MOUNTAIN_CHANCE = 0.12;
-const FOREST_CHANCE = 0.28;
+const FOREST_CHANCE = 0.22;
+const HILL_CHANCE = 0.14;
 const MAX_ATTEMPTS = 100;
 
 export function tileIndex(map: Pick<GameMap, 'width' | 'height'>, hex: Hex): number | undefined {
@@ -72,8 +86,8 @@ export function isLand(terrain: Terrain): boolean {
 /**
  * Generates an 11x11 island from a seed. The same seed and player count always give the same map.
  * Capitals sit on grass, at least MIN_CAPITAL_DISTANCE apart, and can reach each other over
- * grass and forest. Neutral villages sit on grass, away from every other city. Resources (fruit,
- * game, fish, ore) are scattered last.
+ * grass, forest and hills. Neutral villages sit on grass, away from every other city. Resources
+ * (grain, sheep, wood, stone, fish) and their number tokens are scattered last.
  */
 export function generateMap(seed: number, playerCount: number): GameMap {
   if (!Number.isInteger(playerCount) || playerCount < MIN_PLAYERS || playerCount > MAX_PLAYERS) {
@@ -94,7 +108,7 @@ function tryGenerate(rng: Rng, seed: number, playerCount: number): GameMap | und
   const tiles: Tile[] = [];
   for (let row = 0; row < height; row++) {
     for (let col = 0; col < width; col++) {
-      tiles.push({ ...offsetToAxial(col, row), terrain: 'water', resource: null });
+      tiles.push({ ...offsetToAxial(col, row), terrain: 'water', resource: null, token: null, harvested: null, road: false });
     }
   }
   const map: GameMap = { seed, width, height, playerCount, tiles, cities: [] };
@@ -117,8 +131,18 @@ function tryGenerate(rng: Rng, seed: number, playerCount: number): GameMap | und
 }
 
 /** Chance that a tile of each terrain holds its resource (water only next to land). */
-const RESOURCE_CHANCE: Readonly<Record<Terrain, number>> = { grass: 0.18, forest: 0.3, mountain: 0.35, water: 0.3 };
-const TERRAIN_RESOURCE: Readonly<Record<Terrain, Resource>> = { grass: 'fruit', forest: 'game', mountain: 'ore', water: 'fish' };
+const RESOURCE_CHANCE: Readonly<Record<Terrain, number>> = { grass: 0.18, forest: 0.3, hill: 0.32, mountain: 0.35, water: 0.3 };
+const TERRAIN_RESOURCE: Readonly<Record<Terrain, Resource>> = { grass: 'grain', forest: 'wood', hill: 'sheep', mountain: 'stone', water: 'fish' };
+
+/** The resource for a tile: hills hold sheep or stone (a coin flip), every other terrain has one kind. */
+function resourceFor(tile: Tile, rng: Rng): Resource {
+  return tile.terrain === 'hill' && rng.next() < 0.4 ? 'stone' : TERRAIN_RESOURCE[tile.terrain];
+}
+
+/** Numbers every resource tile; runs after placement so the earlier random draws keep their order. */
+function placeTokens(map: GameMap, rng: Rng): void {
+  for (const tile of map.tiles) if (tile.resource) tile.token = rng.pick(TOKEN_VALUES);
+}
 /** Every capital gets at least this many resources on its six neighbours, when the terrain allows. */
 const CAPITAL_RESOURCES = 2;
 
@@ -136,7 +160,7 @@ function placeResources(map: GameMap, rng: Rng): void {
     });
   for (const tile of map.tiles) {
     if (!free(tile) || (tile.terrain === 'water' && !coastal(tile))) continue;
-    if (rng.next() < RESOURCE_CHANCE[tile.terrain]) tile.resource = TERRAIN_RESOURCE[tile.terrain];
+    if (rng.next() < RESOURCE_CHANCE[tile.terrain]) tile.resource = resourceFor(tile, rng);
   }
   for (const city of map.cities) {
     if (city.kind !== 'capital') continue;
@@ -148,11 +172,12 @@ function placeResources(map: GameMap, rng: Rng): void {
     for (const t of ring) {
       if (have >= CAPITAL_RESOURCES) break;
       if (t.resource === null) {
-        t.resource = TERRAIN_RESOURCE[t.terrain];
+        t.resource = resourceFor(t, rng);
         have++;
       }
     }
   }
+  placeTokens(map, rng);
 }
 
 /** Land is the top LAND_SHARE of tiles by (closeness to the centre + smoothed noise). */
@@ -207,7 +232,14 @@ function scatterTerrain(map: GameMap, rng: Rng): void {
   for (const tile of map.tiles) {
     if (!isLand(tile.terrain)) continue;
     const roll = rng.next();
-    tile.terrain = roll < MOUNTAIN_CHANCE ? 'mountain' : roll < MOUNTAIN_CHANCE + FOREST_CHANCE ? 'forest' : 'grass';
+    tile.terrain =
+      roll < MOUNTAIN_CHANCE
+        ? 'mountain'
+        : roll < MOUNTAIN_CHANCE + FOREST_CHANCE
+          ? 'forest'
+          : roll < MOUNTAIN_CHANCE + FOREST_CHANCE + HILL_CHANCE
+            ? 'hill'
+            : 'grass';
   }
 }
 
@@ -271,7 +303,7 @@ function setTerrain(map: GameMap, hex: Hex, terrain: Terrain): void {
 
 /** True when every hex can reach every other by walking over grass and forest only. */
 function connectedOverWalkable(map: GameMap, hexes: readonly Hex[]): boolean {
-  const walkable = (t: Tile): boolean => t.terrain === 'grass' || t.terrain === 'forest';
+  const walkable = (t: Tile): boolean => t.terrain === 'grass' || t.terrain === 'forest' || t.terrain === 'hill';
   const first = hexes[0];
   if (!first) return true;
   const component = findComponents(map, walkable).find((c) => c.includes(tileIndex(map, first) ?? -1));

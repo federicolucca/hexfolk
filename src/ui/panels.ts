@@ -1,10 +1,10 @@
 // What the HUD panel offers for the selected hex: built from the engine's legal actions and
 // checkAction reasons, so the UI never decides what is allowed. Pure: no DOM.
 import { cityAt, tileAtHex } from '../core/board';
-import { cityIncome, populationToNextLevel, supportedUnits, unitCapacity } from '../core/economy';
+import { cityIncome, connectedCities, populationToNextLevel, supportedUnits, unitCapacity } from '../core/economy';
 import { checkAction } from '../core/engine';
 import { previewAttack } from '../core/combat';
-import { HARVEST_COST, TECH_COST, TECH_IDS, UNIT_STATS, UNIT_TYPES, WALLS_COST, WALLS_DEFENCE_BONUS } from '../core/rules';
+import { HARVEST_COST, ROAD_COST, TECH_COST, TECH_IDS, UNIT_STATS, UNIT_TYPES, WALLS_COST, WALLS_DEFENCE_BONUS } from '../core/rules';
 import type { Action, GameState, HexRef } from '../core/state';
 import { PLAYER_COLOURS } from '../render/atlas';
 import { describeCity } from './describe';
@@ -26,9 +26,10 @@ export interface Panel {
 
 const capitalise = (s: string): string => `${s[0]?.toUpperCase() ?? ''}${s.slice(1)}`;
 
-function card(state: GameState, player: number, action: Action, icon: string, label: string, detail: string): PanelCard {
+function card(state: GameState, player: number, action: Action, icon: string | undefined, label: string, detail: string): PanelCard {
   const reason = checkAction(state, player, action);
-  return reason === null ? { icon, label, detail, action } : { icon, label, detail: reason };
+  const base = icon === undefined ? { label } : { icon, label };
+  return reason === null ? { ...base, detail, action } : { ...base, detail: reason };
 }
 
 /** The panel for a hex the human selected, or null when there is nothing to do there. */
@@ -58,7 +59,7 @@ export function panelFor(state: GameState, player: number, hex: HexRef, attacker
     titleParts.push(
       `${describeCity(city)} · level ${city.level}`,
       next === null ? `pop ${city.population}` : `pop ${city.population} (+${next} to grow)`,
-      `+${cityIncome(city)}★/turn`,
+      `+${cityIncome(city, connectedCities(state, player).has(city.id))}★/turn`,
       `units ${supportedUnits(state, city)}/${unitCapacity(city)}`,
     );
     cards.push(card(state, player, { type: 'build_walls', city: city.id }, 'overlays/walls', city.walls ? 'Walls built' : 'Build walls', `${WALLS_COST}★ · defence ×${WALLS_DEFENCE_BONUS}`));
@@ -69,7 +70,10 @@ export function panelFor(state: GameState, player: number, hex: HexRef, attacker
   }
 
   if (tile?.resource) {
-    cards.push(card(state, player, { type: 'harvest', at: { q: hex.q, r: hex.r } }, `overlays/${tile.resource}`, `Harvest ${tile.resource}`, `${HARVEST_COST}★ · +1 pop`));
+    cards.push(card(state, player, { type: 'harvest', at: { q: hex.q, r: hex.r } }, tile.resource === 'fish' ? 'overlays/fish' : undefined, `Harvest ${tile.resource}`, `${HARVEST_COST}★ · +1 pop${tile.token === null ? '' : ` · token ${tile.token}`}`));
+  }
+  if (tile && !city && tile.terrain !== 'water' && !tile.road) {
+    cards.push(card(state, player, { type: 'build_road', at: { q: hex.q, r: hex.r } }, undefined, 'Build road', `${ROAD_COST}★ · half-cost moves, trade routes`));
   }
 
   if (cards.length === 0) return null;
@@ -87,10 +91,10 @@ export function techPanel(state: GameState, player: number): Panel {
 }
 
 const TECH_EFFECT = {
-  hunting: 'harvest game',
+  hunting: 'harvest sheep',
   fishing: 'harvest fish',
   riding: 'train riders',
-  climbing: 'enter mountains, harvest ore',
+  climbing: 'enter mountains, harvest stone',
   archery: 'train archers',
   fortification: 'defenders, walls',
 } as const;

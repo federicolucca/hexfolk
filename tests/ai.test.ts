@@ -16,7 +16,7 @@ describe('GreedyAgent', () => {
 
   it('captures a village it stands on', () => {
     const s = blankGame();
-    s.cities.push({ id: 90, q: MIDDLE.q, r: MIDDLE.r, owner: null, capital: false, level: 1, population: 0, walls: false });
+    s.cities.push({ id: 90, q: MIDDLE.q, r: MIDDLE.r, owner: null, capital: false, level: 1, population: 0, walls: false, harvested: [] });
     const u = addUnit(s, 0, 'warrior', MIDDLE);
     expect(decide(s)[0]).toEqual({ type: 'capture', unit: u.id });
   });
@@ -24,7 +24,7 @@ describe('GreedyAgent', () => {
   it('walks towards a nearby village', () => {
     const s = blankGame();
     s.cities = s.cities.filter((c) => c.owner !== null);
-    s.cities.push({ id: 90, q: MIDDLE.q + 3, r: MIDDLE.r, owner: null, capital: false, level: 1, population: 0, walls: false });
+    s.cities.push({ id: 90, q: MIDDLE.q + 3, r: MIDDLE.r, owner: null, capital: false, level: 1, population: 0, walls: false, harvested: [] });
     s.players[0]!.stars = 0;
     const u = addUnit(s, 0, 'warrior', MIDDLE);
     const move = decide(s).find((a) => a.type === 'move' && a.unit === u.id);

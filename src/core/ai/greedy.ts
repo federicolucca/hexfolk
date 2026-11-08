@@ -2,10 +2,13 @@
 // it to a private copy of the state, and repeats until nothing is left. It only uses the Agent
 // interface, so a minimax or external agent can replace it without engine changes.
 import type { Agent } from '../agent';
-import { cityAt, unitById } from '../board';
+import { cityAt, tileAtHex, unitById } from '../board';
 import { previewAttack } from '../combat';
 import { legalActions, type Observation, step } from '../engine';
-import { distance } from '../hex';
+import { territoryCity } from '../economy';
+import { distance, neighbours } from '../hex';
+import { rollWays } from '../rng';
+import { VARIETY_KINDS } from '../rules';
 import { type TechId, type UnitType } from '../rules';
 import type { Action, City, GameState, HexRef } from '../state';
 
@@ -25,7 +28,7 @@ export type Difficulty = 'easy' | 'normal';
 export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal'];
 export const DEFAULT_DIFFICULTY: Difficulty = 'easy';
 export const EASY_PURCHASES_PER_TURN = 1;
-const PURCHASES: ReadonlySet<Action['type']> = new Set(['train', 'research', 'harvest', 'build_walls']);
+const PURCHASES: ReadonlySet<Action['type']> = new Set(['train', 'research', 'harvest', 'build_walls', 'build_road']);
 
 export const isDifficulty = (v: unknown): v is Difficulty => v === 'easy' || v === 'normal';
 
@@ -65,11 +68,78 @@ function pick(state: GameState, me: number, options: Action[], easy: boolean): A
     bestAttack(state, options, easy) ??
     trainIfThin(state, me, options) ??
     research(options) ??
-    options.find((a) => a.type === 'harvest') ??
+    bestHarvest(state, options) ??
+    connectingRoad(state, me, options) ??
     options.find((a) => a.type === 'build_walls' && threatened(state, me, cityOf(state, a.city))) ??
     bestTrain(options) ??
     bestMove(state, me, options)
   );
+}
+
+/**
+ * The harvest worth most: a new resource kind for its city (a big bonus when it reaches the variety
+ * threshold) and a token that is rolled often (6 and 8 beat 2 and 12).
+ */
+function bestHarvest(state: GameState, options: Action[]): Action | null {
+  let best: Action | null = null;
+  let bestScore = -Infinity;
+  for (const a of options) {
+    if (a.type !== 'harvest') continue;
+    const tile = tileAtHex(state, a.at);
+    const owner = tile?.resource ? state.cities.find((c) => c.owner !== null && distance(c, a.at) <= 1) : undefined;
+    if (!tile?.resource) continue;
+    const kinds = new Set(owner?.harvested ?? []);
+    const isNew = !kinds.has(tile.resource);
+    const score = (isNew ? 2 : 0) + (isNew && kinds.size + 1 === VARIETY_KINDS ? 3 : 0) + rollWays(tile.token ?? 0) / 6;
+    if (score > bestScore) {
+      best = a;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+/**
+ * A road that brings an unconnected city closer to the capital: breadth-first from the capital over
+ * land tiles that already carry a road, hold a city of mine, or lie in my territory (where a road
+ * can be built). The first buildable gap on the path to a city is the road to build.
+ */
+function connectingRoad(state: GameState, me: number, options: Action[]): Action | null {
+  const capital = state.cities.find((c) => c.owner === me && c.capital);
+  if (!capital) return null;
+  const buildable = new Set(options.flatMap((a) => (a.type === 'build_road' ? [`${a.at.q},${a.at.r}`] : [])));
+  if (buildable.size === 0) return null;
+  const key = (h: HexRef): string => `${h.q},${h.r}`;
+  const parent = new Map<string, HexRef | null>([[key(capital), null]]);
+  const queue: HexRef[] = [capital];
+  while (queue.length > 0) {
+    const hex = queue.shift() as HexRef;
+    for (const n of neighbours(hex)) {
+      const tile = tileAtHex(state, n);
+      if (!tile || tile.terrain === 'water' || parent.has(key(n))) continue;
+      const city = cityAt(state, n);
+      const passable = city ? city.owner === me : tile.road || territoryCity(state, me, n) !== undefined;
+      if (!passable) continue;
+      parent.set(key(n), hex);
+      queue.push(n);
+    }
+  }
+  let best: HexRef | null = null;
+  let bestLength = Infinity;
+  for (const city of state.cities) {
+    if (city.owner !== me || city.capital || !parent.has(key(city))) continue;
+    const gaps: HexRef[] = [];
+    for (let at: HexRef | null | undefined = parent.get(key(city)); at; at = parent.get(key(at))) {
+      const t = tileAtHex(state, at);
+      if (t && !t.road && !cityAt(state, at)) gaps.push(at);
+    }
+    const first = gaps.find((g) => buildable.has(key(g)));
+    if (first && gaps.length > 0 && gaps.length < bestLength) {
+      best = first;
+      bestLength = gaps.length;
+    }
+  }
+  return best ? { type: 'build_road', at: { q: best.q, r: best.r } } : null;
 }
 
 const cityOf = (state: GameState, id: number): City | undefined => state.cities.find((c) => c.id === id);

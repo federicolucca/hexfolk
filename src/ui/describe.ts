@@ -9,6 +9,7 @@ import { PALETTE } from '../render/palette';
 const TERRAIN_NAMES: Record<Terrain, string> = {
   grass: 'Grass',
   forest: 'Forest',
+  hill: 'Hill',
   mountain: 'Mountain',
   water: 'Water',
 };
@@ -45,7 +46,7 @@ export function turnLine(state: GameState): string {
 /** The dock's second line for the human: stars and income, or whose turn it is. */
 export function starsLine(state: GameState, player: number, perTurn: number): string {
   const stars = state.players[player]?.stars ?? 0;
-  return `★ ${stars} (+${perTurn}/turn)`;
+  return `★ ${stars} (+${perTurn}/turn) · roll ${state.roll ?? '–'}`;
 }
 
 /** The end screen: a headline and one score line per player, or null while the game is on. */

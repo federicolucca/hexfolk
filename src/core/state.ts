@@ -21,6 +21,8 @@ export interface City {
   level: number;
   population: number;
   walls: boolean;
+  /** Distinct resource kinds this city has harvested (variety bonus at 3+). */
+  harvested: Resource[];
 }
 
 export interface Unit {
@@ -54,6 +56,10 @@ export interface GameState {
   cities: City[];
   units: Unit[];
   nextUnitId: number;
+  /** State of the seeded dice generator; it advances once per round. */
+  rollState: number;
+  /** The latest 2d6 roll (2 to 12), or null before the first round. */
+  roll: number | null;
   over: boolean;
   /** The winner once the game is over; null for a draw or while playing. */
   winner: number | null;
@@ -72,6 +78,7 @@ export type Action =
   | { type: 'attack'; unit: number; target: HexRef }
   | { type: 'research'; tech: TechId }
   | { type: 'build_walls'; city: number }
+  | { type: 'build_road'; at: HexRef }
   | { type: 'end_turn' };
 
 export type GameEvent =
@@ -82,6 +89,8 @@ export type GameEvent =
   | { type: 'attacked'; unit: number; target: number; damage: number; counter: number; killed: boolean; attackerKilled: boolean }
   | { type: 'researched'; player: number; tech: TechId }
   | { type: 'walls_built'; city: number }
+  | { type: 'road_built'; at: HexRef; city: number }
+  | { type: 'rolled'; roll: number; payouts: { player: number; stars: number }[] }
   | { type: 'city_grew'; city: number; level: number }
   | { type: 'income'; player: number; stars: number }
   | { type: 'eliminated'; player: number; by: number }

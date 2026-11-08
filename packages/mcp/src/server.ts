@@ -70,7 +70,7 @@ server.registerTool(
   'submit_actions',
   {
     description:
-      'Apply actions in order. Illegal ones are rejected with a reason and skipped. Include {"type":"end_turn"} to finish the turn; you may also submit in several calls. Action shapes: move {unit,to:{q,r}}, attack {unit,target:{q,r}}, capture {unit}, train {city,unit}, research {tech}, harvest {at:{q,r}}, build_walls {city}, end_turn.',
+      'Apply actions in order. Illegal ones are rejected with a reason and skipped. Include {"type":"end_turn"} to finish the turn; you may also submit in several calls. Action shapes: move {unit,to:{q,r}}, attack {unit,target:{q,r}}, capture {unit}, train {city,unit}, research {tech}, harvest {at:{q,r}}, build_road {at:{q,r}}, build_walls {city}, end_turn.',
     inputSchema: { match_id: matchId, seat, actions: z.array(z.object({ type: z.string() }).passthrough()).max(200) },
   },
   (args) => run(() => store.submitActions(args)),

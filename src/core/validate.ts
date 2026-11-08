@@ -36,6 +36,10 @@ export function parseAction(raw: unknown): Parsed<Action> {
       const at = hex(raw.at);
       return at ? { ok: true, value: { type: 'harvest', at } } : bad('needs "at": {q, r}');
     }
+    case 'build_road': {
+      const at = hex(raw.at);
+      return at ? { ok: true, value: { type: 'build_road', at } } : bad('needs "at": {q, r}');
+    }
     case 'train': {
       const unit = UNIT_TYPES.find((u) => u === raw.unit);
       return isInt(raw.city) && unit ? { ok: true, value: { type: 'train', city: raw.city, unit } } : bad(`needs integer "city" and "unit" one of ${UNIT_TYPES.join(', ')}`);

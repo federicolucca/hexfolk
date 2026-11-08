@@ -21,6 +21,27 @@ export const PALETTE = {
   healthBad: '#e0453f',
   /** Ink for drawn details (flag poles, outlines), matching the dark outlines of the tile art. */
   ink: '#2b2a1f',
+  /** Flat vector placeholders for resources, number tokens and roads (no atlas art yet, see docs/ART.md). */
+  resource: {
+    grain: '#e3b341',
+    grainDark: '#a8791c',
+    sheepWool: '#f4f1e8',
+    sheepFace: '#4a443a',
+    woodTrunk: '#7a4e2b',
+    woodLeaf: '#2f7d45',
+    stone: '#9aa3a8',
+    stoneDark: '#5c666c',
+  },
+  token: {
+    face: '#f6edd2',
+    ring: '#2b2a1f',
+    text: '#2b2a1f',
+    /** The odds-on numbers (6 and 8) are red, as on a dice chart. */
+    hot: '#c0392b',
+    /** A harvested tile's token: it now pays out when rolled. */
+    paying: '#f2c14e',
+  },
+  road: { edge: '#2b2a1f', fill: '#d9b77e' },
   /** Player colours, by player index. */
   players: [
     { name: 'Blue', colour: '#3a7bd5' },

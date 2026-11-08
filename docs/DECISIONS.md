@@ -242,3 +242,39 @@ Choices made where the brief changed or was ambiguous. Newest first.
 - Autosave writes the whole state to localStorage at the end of every turn (after the human's and after the AIs').
   A reload resumes it unless the URL has a different `?seed=`. A new game takes the typed seed, or a random one.
 - Players: 2 to 4 (`?players=`, default 4), player 0 is the human and the rest are greedy AIs.
+
+## Economy v0.2: resources, hills, roads, tokens
+
+- Mechanics only: nothing here copies names, text or art from another game.
+- Resources are grain (grass), wood (forest), sheep (hill), stone (hill and mountain) and fish (water);
+  they replace fruit/game/ore. A hill tile holds sheep (60%) or stone (40%). Stars stay the only currency.
+- Tech mapping (the 6 techs are unchanged): grain none, wood none, sheep Hunting, stone Climbing, fish Fishing.
+  Riding, Archery and Fortification keep their unit and wall unlocks. Hunting now means sheep (was game);
+  Climbing still opens mountains and now also stone.
+- Hills are a 5th terrain, generated after mountains and forests (14% of land). They move like forest: entering
+  ends the move, no tech needed. Map generation counts them as walkable for the capital connectivity check.
+- Harvest still costs 2 stars and adds 1 population. The tile keeps its number token and remembers what was
+  harvested (`tile.harvested`); `tile.resource` is null after the harvest, as before.
+- Variety: a city that has harvested 3 or more distinct kinds earns +1 star per turn (`city.harvested`).
+  The record stays with the city if it is captured.
+- Roads: `build_road {at}` costs 2 stars on a land tile in the player's territory (a city or a neighbour of one;
+  no tech, not on a city tile, not on water). Road tiles and city tiles are linked. A step between two linked tiles
+  costs half a movement point and never ends the move (so a road through a forest or hill is a fast lane).
+  Roads belong to nobody: the territory rule applies when building, and a trade chain only passes tiles that are
+  not in an enemy city's reach. A city (not the capital) joined to the owner's capital by an unbroken chain of own
+  city tiles and road tiles earns +1 star per turn (the trade route).
+- Number tokens: every resource tile gets a token from 2, 3, 4, 5, 6, 8, 9, 10, 11, 12 at map generation (uniform
+  pick, after resources are placed). At the start of each round (when the turn order wraps to player 0, and once
+  at game start) the state's own seeded generator (`state.rollState`, advanced once per round) rolls 2d6. Every
+  harvested tile with that number pays +1 star to the owner of the nearest city within 1 hex. The roll is in the
+  state (`state.roll`) and in a `rolled` event, so replays rebuild it exactly. Eliminated players receive nothing.
+- Score is unchanged (5 per city, 1 per population, 2 per tech, 1 per unit): variety and trade routes already feed
+  population and tech through stars.
+- The greedy AI harvests for variety first (a big bonus for reaching the third kind) and for likely tokens
+  (6 and 8 before 2 and 12), then builds the road that closes the first gap between an unconnected city and its
+  capital. Token income is counted by expected value only (`expectedTokenIncome`, shown to MCP agents as
+  `tokenIncome`).
+- MCP: `resources` is a list of `{q, r, kind, token, harvested}`, `roads` lists road tiles, cities list
+  `resources` and `trade`, and `build_road {at}` is a new action. Terrain rows use `h` for hill.
+- Art: the Gemini credit is exhausted (HTTP 402 on the one try), so grain, sheep, wood and stone (and fish
+  reuses the atlas overlay) are flat vector placeholders in `src/render/resources.ts`; tokens and roads too.

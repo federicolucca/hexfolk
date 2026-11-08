@@ -4,6 +4,9 @@ import type { City, GameState, HexRef, Unit } from '../core/state';
 import { type AtlasFrame, frameName, unitFrameName } from './atlas';
 import type { Loaded, LoadedAtlas, LoadedCommon } from './atlasLoader';
 import { type Camera, canvasTransform, type Viewport } from './camera';
+import { neighbours } from '../core/hex';
+import { isRoadTile } from '../core/economy';
+import { drawResource, drawRoad, drawToken } from './resources';
 import { hexCorners, hexToPixel, type Point, type TileMetrics } from './layout';
 import { PALETTE } from './palette';
 
@@ -92,8 +95,18 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: Scene): void {
       if (frame) drawFrame(ctx, theme, hd, frame, centre);
       const walls = city?.walls ? common.atlas.frames['overlays/walls'] : undefined;
       if (walls) drawFrame(ctx, common, hd, walls, centre);
-      const overlay = tile.resource && !city ? common.atlas.frames[`overlays/${tile.resource}`] : undefined;
-      if (overlay) drawFrame(ctx, common, hd, overlay, { x: centre.x - 20, y: centre.y + 4 }, RESOURCE_SCALE);
+      if (tile.road) {
+        const linked = neighbours(tile).filter((n) => isRoadTile(game, n));
+        drawRoad(ctx, centre, linked.map((n) => hexToPixel(n, metrics)), 7);
+      }
+      if (city) continue;
+      if (tile.resource === 'fish') {
+        const overlay = common.atlas.frames['overlays/fish'];
+        if (overlay) drawFrame(ctx, common, hd, overlay, { x: centre.x - 20, y: centre.y + 4 }, RESOURCE_SCALE);
+      } else if (tile.resource) {
+        drawResource(ctx, tile.resource, centre.x - 20, centre.y + 4, 34);
+      }
+      if (tile.token !== null && (tile.resource || tile.harvested)) drawToken(ctx, tile.token, centre.x + 22, centre.y + 12, 11, tile.harvested !== null);
     }
     for (const tile of tiles) {
       const city = cities.get(key(tile));

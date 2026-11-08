@@ -21,7 +21,7 @@ export function defenceBonus(state: GameState, defender: Unit): number {
 
 /**
  * Attack and defence are scaled by health. The damage split follows the ratio of the two forces
- * (the ratio of the two forces). A defender that survives hits back, if the attacker is within its range.
+ * A defender that survives hits back, if the attacker is within its range.
  */
 export function previewAttack(state: GameState, attacker: Unit, defender: Unit): AttackPreview {
   const a = UNIT_STATS[attacker.type];

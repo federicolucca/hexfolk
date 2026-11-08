@@ -56,9 +56,9 @@ describe('generateMap', () => {
     });
   });
 
-  it('uses only the four terrains and has a reasonable amount of land', () => {
+  it('uses only the five terrains and has a reasonable amount of land', () => {
     forEachMap((map) => {
-      for (const t of map.tiles) expect(['grass', 'forest', 'mountain', 'water']).toContain(t.terrain);
+      for (const t of map.tiles) expect(['grass', 'forest', 'hill', 'mountain', 'water']).toContain(t.terrain);
       const land = map.tiles.filter((t) => isLand(t.terrain)).length;
       expect(land).toBeGreaterThanOrEqual(50);
       expect(land).toBeLessThanOrEqual(80);
@@ -85,7 +85,7 @@ describe('generateMap', () => {
       // Flood fill over walkable land from the first capital.
       const walkable = (h: { q: number; r: number }): boolean => {
         const t = terrainAt(map, h);
-        return t === 'grass' || t === 'forest';
+        return t === 'grass' || t === 'forest' || t === 'hill';
       };
       const start = capitals[0];
       expect(start).toBeDefined();
@@ -146,7 +146,7 @@ describe('resources', () => {
       const cities = new Set(map.cities.map((c) => `${c.q},${c.r}`));
       for (const t of map.tiles) {
         if (t.resource === null) continue;
-        expect(RESOURCE_TERRAIN[t.resource]).toBe(t.terrain);
+        expect(RESOURCE_TERRAIN[t.resource]).toContain(t.terrain);
         expect(cities.has(`${t.q},${t.r}`)).toBe(false);
         if (t.resource === 'fish') expect(neighbours(t).some((n) => isLand(tileAt(map, n)?.terrain ?? 'water'))).toBe(true);
       }

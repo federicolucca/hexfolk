@@ -21,21 +21,21 @@ describe('panelFor', () => {
 
   it('offers capture to your unit on a city that is not yours', () => {
     const state = blankGame();
-    state.cities.push({ id: 7, q: MIDDLE.q, r: MIDDLE.r, owner: null, capital: false, level: 1, population: 0, walls: false });
+    state.cities.push({ id: 7, q: MIDDLE.q, r: MIDDLE.r, owner: null, capital: false, level: 1, population: 0, walls: false, harvested: [] });
     const w = addUnit(state, 0, 'warrior', MIDDLE);
     expect(panelFor(state, 0, MIDDLE)?.cards[0]).toMatchObject({ label: 'Capture', action: { type: 'capture', unit: w.id } });
   });
 
-  it('offers harvesting a resource, and nothing on an empty tile or on the enemy turn', () => {
+  it('offers harvesting a resource, only a road on an empty tile, and nothing or on the enemy turn', () => {
     const state = blankGame();
-    state.cities.push({ id: 7, q: MIDDLE.q, r: MIDDLE.r, owner: 0, capital: false, level: 1, population: 0, walls: false });
+    state.cities.push({ id: 7, q: MIDDLE.q, r: MIDDLE.r, owner: 0, capital: false, level: 1, population: 0, walls: false, harvested: [] });
     const hex = neighbours(MIDDLE)[0];
     const tile = hex && state.tiles.find((t) => t.q === hex.q && t.r === hex.r);
     if (!tile || !hex) throw new Error('setup');
-    tile.resource = 'fruit';
-    expect(panelFor(state, 0, hex)?.cards[0]).toMatchObject({ label: 'Harvest fruit', action: { type: 'harvest', at: hex } });
+    tile.resource = 'grain';
+    expect(panelFor(state, 0, hex)?.cards[0]).toMatchObject({ label: 'Harvest grain', action: { type: 'harvest', at: hex } });
     const empty = neighbours(MIDDLE)[1];
-    if (empty) expect(panelFor(state, 0, empty)).toBeNull();
+    if (empty) expect(panelFor(state, 0, empty)?.cards.map((c) => c.label)).toEqual(['Build road']);
     expect(panelFor(state, 1, hex)).toBeNull();
   });
 });

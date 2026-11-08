@@ -1,10 +1,12 @@
 // Where a unit can move this turn. Pure.
 import { neighbours } from './hex';
 import { tileIndexIn } from './board';
+import { isRoadTile } from './economy';
 import { UNIT_STATS } from './rules';
 import type { GameState, HexRef, Unit } from './state';
 
-/** Grass costs 1 movement point; forest and mountain end the move; water is impassable. */
+/** Grass costs 1 movement point; forest, hill and mountain end the move; water is impassable.
+ * Between two road (or city) tiles a step costs half a point and never ends the move. */
 export function canEnter(state: GameState, unit: Unit, hex: HexRef): boolean {
   const tile = state.tiles[tileIndexIn(state, hex) ?? -1];
   if (!tile || tile.terrain === 'water') return false;
@@ -28,7 +30,8 @@ export function reachable(state: GameState, unit: Unit): HexRef[] {
     for (const n of neighbours(hex)) {
       if (!canEnter(state, unit, n)) continue;
       const terrain = state.tiles[tileIndexIn(state, n) ?? -1]?.terrain;
-      const remaining = terrain === 'grass' ? left - 1 : 0;
+      const onRoad = isRoadTile(state, hex) && isRoadTile(state, n);
+      const remaining = onRoad ? left - 0.5 : terrain === 'grass' ? Math.max(0, left - 1) : 0;
       const key = `${n.q},${n.r}`;
       const seen = best.get(key);
       if (seen !== undefined && seen >= remaining) continue;

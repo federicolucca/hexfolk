@@ -1,12 +1,13 @@
 // The headless engine. The browser UI, the AI, the simulator and the MCP server all play through
 // these four functions: newGame, observe, legalActions and step. Pure and deterministic.
 import { cityAt, sameHex, tileAtHex, unitAt, unitById } from './board';
-import { income, levelFor, score, supportedUnits, territoryCity, unitCapacity } from './economy';
+import { income, levelFor, tokenPayouts, score, supportedUnits, territoryCity, unitCapacity } from './economy';
 import { previewAttack } from './combat';
 import { distance, neighbours } from './hex';
 import { generateMap } from './map';
+import { rollTwoDice } from './rng';
 import { reachable } from './movement';
-import { DEFAULT_TURN_LIMIT, HARVEST_COST, RESOURCE_TECH, STARTING_STARS, TECH_COST, TECH_IDS, UNIT_STATS, UNIT_TYPES, WALLS_COST } from './rules';
+import { DEFAULT_TURN_LIMIT, HARVEST_COST, RESOURCE_TECH, ROAD_COST, STARTING_STARS, TECH_COST, TECH_IDS, UNIT_STATS, UNIT_TYPES, WALLS_COST } from './rules';
 import type { Action, GameEvent, GameState, Player, Rejection, StepResult } from './state';
 
 export interface NewGameOptions {
@@ -38,9 +39,12 @@ export function newGame({ seed, players, turnLimit = DEFAULT_TURN_LIMIT }: NewGa
       level: 1,
       population: 0,
       walls: false,
+      harvested: [],
     })),
     units: [],
     nextUnitId: 1,
+    rollState: map.seed ^ 0x5f3759df,
+    roll: null,
     over: false,
     winner: null,
   };
@@ -48,6 +52,7 @@ export function newGame({ seed, players, turnLimit = DEFAULT_TURN_LIMIT }: NewGa
   for (const city of state.cities) {
     if (city.capital && city.owner !== null) addUnit(state, 'warrior', city.owner, city, city.id, false);
   }
+  rollRound(state, []);
   startTurn(state, []);
   return state;
 }
@@ -109,6 +114,15 @@ export function checkAction(state: GameState, player: number, action: Action): s
       if ((me?.stars ?? 0) < HARVEST_COST) return `needs ${HARVEST_COST} stars`;
       return null;
     }
+    case 'build_road': {
+      const tile = tileAtHex(state, action.at);
+      if (!tile || tile.terrain === 'water') return 'roads go on land tiles';
+      if (tile.road) return 'there is already a road here';
+      if (cityAt(state, action.at)) return 'cities already count as road';
+      if (!territoryCity(state, player, action.at)) return 'not next to one of your cities';
+      if ((me?.stars ?? 0) < ROAD_COST) return `needs ${ROAD_COST} stars`;
+      return null;
+    }
     case 'attack': {
       const unit = unitById(state, action.unit);
       if (!unit || unit.owner !== player) return 'no such unit of yours';
@@ -155,6 +169,12 @@ export function legalActions(state: GameState, player: number): Action[] {
   for (const city of state.cities) {
     if (city.owner !== player) continue;
     legal({ type: 'build_walls', city: city.id });
+    for (const hex of neighbours(city)) {
+      const key = `r${hex.q},${hex.r}`;
+      if (harvestable.has(key)) continue;
+      harvestable.add(key);
+      legal({ type: 'build_road', at: { q: hex.q, r: hex.r } });
+    }
     for (const unit of UNIT_TYPES) legal({ type: 'train', city: city.id, unit });
     for (const hex of [city, ...neighbours(city)]) {
       const key = `${hex.q},${hex.r}`;
@@ -245,6 +265,8 @@ function apply(state: GameState, player: number, action: Action, events: GameEve
       if (!tile?.resource || !city || !me) return;
       me.stars -= HARVEST_COST;
       events.push({ type: 'harvested', at: { q: action.at.q, r: action.at.r }, resource: tile.resource, city: city.id });
+      tile.harvested = tile.resource;
+      if (!city.harvested.includes(tile.resource)) city.harvested.push(tile.resource);
       tile.resource = null;
       city.population++;
       const level = levelFor(city.population);
@@ -252,6 +274,15 @@ function apply(state: GameState, player: number, action: Action, events: GameEve
         city.level = level;
         events.push({ type: 'city_grew', city: city.id, level });
       }
+      return;
+    }
+    case 'build_road': {
+      const tile = tileAtHex(state, action.at);
+      const city = territoryCity(state, player, action.at);
+      if (!tile || !city || !me) return;
+      me.stars -= ROAD_COST;
+      tile.road = true;
+      events.push({ type: 'road_built', at: { q: action.at.q, r: action.at.r }, city: city.id });
       return;
     }
     case 'attack': {
@@ -316,9 +347,13 @@ function endTurn(state: GameState, player: number, events: GameEvent[]): void {
   events.push({ type: 'turn_ended', player });
   // Next living player; the turn number goes up each time the order passes player 0.
   let next = player;
+  let newRound = false;
   for (let i = 0; i < state.players.length; i++) {
     next = (next + 1) % state.players.length;
-    if (next === 0) state.turn++;
+    if (next === 0) {
+      state.turn++;
+      newRound = true;
+    }
     if (state.players[next]?.alive) break;
   }
   state.current = next;
@@ -330,6 +365,7 @@ function endTurn(state: GameState, player: number, events: GameEvent[]): void {
     events.push({ type: 'game_over', winner: state.winner, reason: 'turn_limit' });
     return;
   }
+  if (newRound) rollRound(state, events);
   startTurn(state, events);
 }
 
@@ -348,4 +384,17 @@ function startTurn(state: GameState, events: GameEvent[]): void {
     player.stars += stars;
     events.push({ type: 'income', player: player.id, stars });
   }
+}
+
+/** The round's 2d6 roll from the seeded generator; harvested tiles with that token pay their owners. */
+function rollRound(state: GameState, events: GameEvent[]): void {
+  const { state: rollState, roll } = rollTwoDice(state.rollState);
+  state.rollState = rollState;
+  state.roll = roll;
+  const payouts = tokenPayouts(state, roll);
+  for (const p of payouts) {
+    const player = state.players[p.player];
+    if (player) player.stars += p.stars;
+  }
+  events.push({ type: 'rolled', roll, payouts });
 }

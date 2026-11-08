@@ -47,7 +47,7 @@ public/     static files; public/atlas/ is built from assets/ by `npm run atlas`
 type UnitType = 'warrior' | 'archer' | 'rider' | 'defender';
 type TechId = 'hunting' | 'fishing' | 'riding' | 'climbing' | 'archery' | 'fortification';
 
-interface Tile   { q; r; terrain: 'grass' | 'forest' | 'mountain' | 'water'; resource }  // axial
+interface Tile   { q; r; terrain: 'grass' | 'forest' | 'hill' | 'mountain' | 'water'; resource; token; harvested; road }  // axial
 interface Player { id; stars; techs: TechId[]; alive }
 interface City   { id; q; r; owner: number | null; capital; level; population; walls }
 interface Unit   { id; type; owner; q; r; hp; moved; attacked; home: number | null }

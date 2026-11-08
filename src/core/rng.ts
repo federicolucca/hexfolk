@@ -40,3 +40,24 @@ export function hashHex(seed: number, q: number, r: number): number {
   h = Math.imul(h ^ (h >>> 15), 0x846ca68b);
   return (h ^ (h >>> 16)) >>> 0;
 }
+
+/** One mulberry32 step on a plain number state, so the generator can live inside the game state as JSON. */
+export function stepRngState(state: number): { state: number; value: number } {
+  const s = (state + 0x6d2b79f5) >>> 0;
+  let t = s;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return { state: s, value: ((t ^ (t >>> 14)) >>> 0) / 4294967296 };
+}
+
+/** A 2d6 roll (2 to 12) from a stored generator state: the roll and the next state. */
+export function rollTwoDice(state: number): { state: number; roll: number } {
+  const a = stepRngState(state);
+  const b = stepRngState(a.state);
+  return { state: b.state, roll: 2 + Math.floor(a.value * 6) + Math.floor(b.value * 6) };
+}
+
+/** Chance (out of 36) that two dice add up to n. */
+export function rollWays(n: number): number {
+  return n < 2 || n > 12 ? 0 : 6 - Math.abs(n - 7);
+}

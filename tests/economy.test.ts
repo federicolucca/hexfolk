@@ -9,7 +9,7 @@ import { addUnit, blankGame, MIDDLE } from './helpers';
 /** A blank 2-player board with one city of player 0 in the middle. */
 function withCity(fields: Partial<City> = {}): { state: GameState; city: City } {
   const state = blankGame();
-  const city: City = { id: 99, q: MIDDLE.q, r: MIDDLE.r, owner: 0, capital: false, level: 1, population: 0, walls: false, ...fields };
+  const city: City = { id: 99, q: MIDDLE.q, r: MIDDLE.r, owner: 0, capital: false, level: 1, population: 0, walls: false, harvested: [], ...fields };
   state.cities.push(city);
   const me = state.players[0];
   if (me) me.stars = 20;
@@ -18,7 +18,7 @@ function withCity(fields: Partial<City> = {}): { state: GameState; city: City } 
 
 describe('income', () => {
   it('pays base + population, plus 1 for a capital', () => {
-    const base = { id: 0, q: 0, r: 0, owner: 0, capital: false, level: 1, population: 0, walls: false };
+    const base = { id: 0, q: 0, r: 0, owner: 0, capital: false, level: 1, population: 0, walls: false, harvested: [] };
     expect(cityIncome(base)).toBe(1);
     expect(cityIncome({ ...base, capital: true })).toBe(2);
     expect(cityIncome({ ...base, population: 3 })).toBe(4);
@@ -38,7 +38,7 @@ describe('income', () => {
 describe('levels', () => {
   it('rise at 2 and 5 total population, up to level 3', () => {
     expect([0, 1, 2, 4, 5, 9].map(levelFor)).toEqual([1, 1, 2, 2, 3, 3]);
-    const city = { id: 0, q: 0, r: 0, owner: 0, capital: false, level: 2, population: 3, walls: false };
+    const city = { id: 0, q: 0, r: 0, owner: 0, capital: false, level: 2, population: 3, walls: false, harvested: [] };
     expect(populationToNextLevel(city)).toBe(2);
     expect(populationToNextLevel({ ...city, level: 3 })).toBeNull();
     expect(unitCapacity(city)).toBe(3);
@@ -52,7 +52,7 @@ describe('harvest', () => {
     if (!hex) throw new Error('no hex');
     const tile = state.tiles.find((t) => t.q === hex.q && t.r === hex.r);
     if (!tile) throw new Error('no tile');
-    tile.resource = 'fruit';
+    tile.resource = 'grain';
     const { state: after, events } = step(state, 0, [{ type: 'harvest', at: hex }]);
     expect(after.players[0]?.stars).toBe(18);
     expect(after.tiles.find((t) => t.q === hex.q && t.r === hex.r)?.resource).toBeNull();
@@ -67,16 +67,16 @@ describe('harvest', () => {
     const tileA = state.tiles.find((t) => t.q === a.q && t.r === a.r);
     const tileB = state.tiles.find((t) => t.q === b.q && t.r === b.r);
     if (!tileA || !tileB) throw new Error('no tile');
-    tileA.terrain = 'forest';
-    tileA.resource = 'game';
+    tileA.terrain = 'hill';
+    tileA.resource = 'sheep';
     expect(checkAction(state, 0, { type: 'harvest', at: a })).toMatch(/needs hunting/);
     state.players[0]?.techs.push('hunting');
     expect(checkAction(state, 0, { type: 'harvest', at: a })).toBeNull();
     const far = { q: city.q + 3, r: city.r };
     const farTile = state.tiles.find((t) => t.q === far.q && t.r === far.r);
-    if (farTile) farTile.resource = 'fruit';
+    if (farTile) farTile.resource = 'grain';
     expect(checkAction(state, 0, { type: 'harvest', at: far })).toMatch(/not next to/);
-    tileB.resource = 'fruit';
+    tileB.resource = 'grain';
     const me = state.players[0];
     if (me) me.stars = 1;
     expect(checkAction(state, 0, { type: 'harvest', at: b })).toMatch(/needs 2 stars/);
@@ -123,7 +123,7 @@ describe('train', () => {
 describe('capture', () => {
   it('takes a neutral village with a unit that started its turn there', () => {
     const state = blankGame();
-    const village: City = { id: 50, q: MIDDLE.q, r: MIDDLE.r, owner: null, capital: false, level: 1, population: 0, walls: false };
+    const village: City = { id: 50, q: MIDDLE.q, r: MIDDLE.r, owner: null, capital: false, level: 1, population: 0, walls: false, harvested: [] };
     state.cities.push(village);
     const w = addUnit(state, 0, 'warrior', MIDDLE);
     const { state: after, events } = step(state, 0, [{ type: 'capture', unit: w.id }]);
@@ -134,7 +134,7 @@ describe('capture', () => {
 
   it('is not allowed on the turn the unit arrives, nor on your own city', () => {
     const state = blankGame();
-    state.cities.push({ id: 50, q: MIDDLE.q, r: MIDDLE.r, owner: null, capital: false, level: 1, population: 0, walls: false });
+    state.cities.push({ id: 50, q: MIDDLE.q, r: MIDDLE.r, owner: null, capital: false, level: 1, population: 0, walls: false, harvested: [] });
     const w = addUnit(state, 0, 'warrior', { q: MIDDLE.q - 1, r: MIDDLE.r });
     const moved = step(state, 0, [{ type: 'move', unit: w.id, to: MIDDLE }]).state;
     expect(checkAction(moved, 0, { type: 'capture', unit: w.id })).toMatch(/start its turn/);
@@ -183,7 +183,7 @@ describe('legal actions', () => {
     const hex = neighbours(city)[0];
     const tile = hex && state.tiles.find((t) => t.q === hex.q && t.r === hex.r);
     if (!tile || !hex) throw new Error('setup');
-    tile.resource = 'fruit';
+    tile.resource = 'grain';
     const legal = legalActions(state, 0);
     expect(legal).toContainEqual({ type: 'train', city: city.id, unit: 'warrior' });
     expect(legal).not.toContainEqual({ type: 'train', city: city.id, unit: 'archer' });

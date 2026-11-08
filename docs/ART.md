@@ -83,5 +83,7 @@ Minor, none of them blocking:
 | Image | Problem |
 | --- | --- |
 | `greenlands/water_1` | A small pale-blue spill just outside the lower-left edge (covered by the neighbouring tiles except on the map border). A redo with `--ref greenlands/village_1` came out washed-out grey; the third try hit the end of the prepaid credits. |
-| `greenlands/hill_1` | Two cottages on the hills. Hills are in the atlas only, not on the map. The hill prompt now says "no buildings". |
+| `greenlands/hill_1` | Two cottages on the hills. Hills are on the map since v0.2. The hill prompt now says "no buildings". |
 | `units/archer_red`, `archer_yellow` | Dark blue trousers kept from the blue archer (the hood, tunic and cloak carry the team colour). |
+| `overlays/grain`, `overlays/sheep`, `overlays/wood`, `overlays/stone` | Not generated: the Gemini credit was exhausted (HTTP 402). The game draws flat vector placeholders in code (`src/render/resources.ts`, palette entries `resource`, `token`, `road`), also in the legend. To replace them add the prompts to `OVERLAYS` in `scripts/gen_tiles_gemini.py`, run `--category overlays --names grain sheep wood stone`, and draw the frames from the common atlas in `renderer.ts` and `legend.ts`. The old `overlays/fruit`, `game` and `ore` frames are unused. |
+| Number tokens, roads | Drawn in code only (a cream disc with the number, a two-tone line between road tiles). Could get proper art, but flat lines are intended. |

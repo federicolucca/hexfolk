@@ -17,16 +17,27 @@ short, readable at a glance and playable one-handed on a phone. Each game is set
 themes (greenlands, drylands, icelands, deadlands) with its own hand-drawn-style tile art, drawn on
 a canvas. There is no backend and nothing to install.
 
-### Rules (v0.1)
+### Rules (v0.2)
 
-- **Map:** 11x11 pointy-top hexes, generated from a seed. Terrains: grass, forest, mountain, water.
+- **Map:** 11x11 pointy-top hexes, generated from a seed. Terrains: grass, forest, hill, mountain, water.
+  Forests, hills and mountains end a unit's move when it enters them (mountains need Climbing).
   Each player starts with a capital, and neutral villages wait to be captured.
 - **Economy:** every city produces *stars* each turn (a base amount plus its population).
-  Stars buy techs and units.
+  Stars are the only currency; they buy techs, units and roads.
+- **Resources:** grain (grass), wood (forest), sheep (hills), stone (hills and mountains) and fish
+  (water). Harvesting one next to your city costs 2 stars and adds 1 population. Grain and wood
+  need no tech; sheep need Hunting, stone Climbing, fish Fishing.
+- **Variety:** a city that has harvested 3 or more different resource kinds earns +1 star per turn.
+- **Number tokens:** every resource tile carries a number from 2 to 12 (never 7). At the start of
+  each round two dice are rolled (from the game's seeded generator, so replays are identical), and
+  every harvested tile showing that number pays its owner +1 star. The last roll is in the status bar.
+- **Roads:** build one on a land tile in your territory (a city or a neighbour of one) for 2 stars,
+  with no tech. A step between two road tiles (cities count as road) costs half a movement point.
+  A city joined to your capital by an unbroken chain of road and city tiles earns +1 star per turn.
 - **Cities:** they grow by gathering resources from adjacent tiles, and level up at population
   thresholds to unlock bonuses.
 - **Techs (6):** Hunting, Fishing, Riding, Climbing, Archery, Fortification. Each one unlocks a
-  terrain action or a unit.
+  resource, terrain or unit.
 - **Units (4):** Warrior, Archer, Rider, Defender, each with attack, defence, movement, range and
   health.
 - **Combat:** deterministic, with no dice. The outcome comes from a simple formula based on the
