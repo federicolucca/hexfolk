@@ -13,11 +13,12 @@
     "predev": "npm run atlas",
     "atlas": "node scripts/build-atlas.ts",
     "prebuild": "npm run atlas",
-    "build": "tsc --noEmit && tsc --noEmit -p scripts && vite build",
+    "build": "tsc --noEmit && tsc --noEmit -p scripts && tsc --noEmit -p bench && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "sim": "vite build -c vite.node.config.ts --logLevel error && node dist-node/sim.js",
-    "mcp:build": "npm install --prefix packages/mcp && vite build -c packages/mcp/vite.config.ts --logLevel error"
+    "mcp:build": "npm install --prefix packages/mcp && vite build -c packages/mcp/vite.config.ts --logLevel error",
+    "bench": "vite build -c vite.node.config.ts --logLevel error && node dist-node/bench.js"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
