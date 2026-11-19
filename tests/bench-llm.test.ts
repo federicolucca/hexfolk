@@ -89,6 +89,14 @@ describe('decision agents', () => {
     expect(f.calls).toHaveLength(0);
   });
 
+  it('plays a forced move without calling the model', async () => {
+    vi.stubEnv('OPENROUTER_API_KEY', SECRET);
+    const f = decisionFetch('0');
+    const d = await new DecisionStepAgent('gemini', f.fn).choose(observe(state, 0), [{ type: 'end_turn' }]);
+    expect(d.action).toEqual({ type: 'end_turn' });
+    expect(f.calls).toHaveLength(0);
+  });
+
   it('each provider reads its own key from the environment', async () => {
     vi.stubEnv('BESPOKE_API_KEY', '');
     await expect(new DecisionStepAgent('nimble', decisionFetch('0').fn).choose(observe(state, 0), legal)).rejects.toThrow(/BESPOKE_API_KEY is not set/);

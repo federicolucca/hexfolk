@@ -110,6 +110,7 @@ export const DECISION_MODELS: Readonly<Record<string, DecisionProvider>> = {
 export const MAX_DECISION_OPTIONS = 255;
 
 interface DecisionResponse {
+  detail?: unknown;
   answers?: Record<string, { choice?: string; probabilities?: Record<string, number> }>;
   usage?: { input_tokens?: number; output_tokens?: number; cost?: number };
   error?: { message?: string; code?: number };
@@ -128,6 +129,8 @@ export class DecisionStepAgent implements StepAgent {
   }
 
   async choose(view: Observation, legal: Action[]): Promise<Decision> {
+    // One legal action leaves nothing to decide (some APIs refuse a one-option question): play it, no call.
+    if (legal.length === 1) return { action: legal[0], raw: 'forced: one legal action' };
     if (legal.length > MAX_DECISION_OPTIONS) return { action: { tooManyOptions: legal.length }, raw: `not sent: ${legal.length} legal actions` };
     const body = { model: this.provider.model, ...decisionRequest(view, legal) };
     const data = await this.post(body);
@@ -152,7 +155,7 @@ export class DecisionStepAgent implements StepAgent {
         });
         const data = (await res.json()) as DecisionResponse;
         if (res.ok && !data.error) return data;
-        last = `HTTP ${res.status}: ${data.error?.message ?? 'no message'}`;
+        last = `HTTP ${res.status}: ${data.error?.message ?? (data.detail ? JSON.stringify(data.detail).slice(0, 200) : 'no message')}`;
         if (res.status < 500 && res.status !== 429) break;
       } catch (err) {
         last = err instanceof Error ? err.message : String(err);
