@@ -96,6 +96,45 @@ confirmed. A disproved expectation is reported as it is; the protocol, the rules
 not changed to make numbers fit. If a rules bug is found during the measurement, the measurement
 stops and every game already played is replayed after the fix.
 
+## Amendment v2 (2026-11-19)
+
+Written and committed before any decision-model game on the test set. At this point final batch 1
+(reference players only, 1200 games) had already been run under v1; batches 2 and 3 (language
+models) had not. Nothing below changes batches 1 to 3 or their expectations.
+
+**Reason.** Since v1, native decision models are available through the same provider
+(`google/gemini-decision-1`, released 2026-11-11, on OpenRouter's System One endpoint). v1's
+"typed" agent is a text-generating model constrained by a schema, not a decision model. The
+question "does a native decision model play as well as a text-generating model?" is the central
+question of the method this benchmark carries over to a second domain, and v1 cannot answer it.
+
+**Change: a third language-model agent type, `decision`.** The agent sends the same rules and
+state text as the other model agents as the request state, and the legal actions (numbered, as in
+the typed prompt) as the options of one `choice` question; it plays the option the model ranks
+first. Models: `gemini-decision` = `google/gemini-decision-1` (OpenRouter), and `nimble-decision`
+= Bespoke Nimble v4-max (Bespoke Labs API, an exception to the OpenRouter-only rule approved by
+the owner on 2026-11-19), run only if an API key is available before the batch starts. A position
+with more legal actions than the API allows in one question (255) is not sent: the decision is
+logged as malformed with the reason `tooManyOptions`, and these cases are reported apart. The
+probability the model gives its chosen action is kept in the log.
+
+**Tuning.** Tuning seeds may be used to fix the wording of the decision agent's instruction only.
+Nothing else in v1 changes.
+
+**Final batch 4 (test set).** Each decision agent against `random`, `rule` and `lookahead`, on
+seeds 100001-100025, both seats (50 games per pairing, 150 games per decision agent).
+
+**Question and expectation (written before any decision-model game).**
+
+| # | Question | Expectation |
+| --- | --- | --- |
+| Q8 | Does a native decision model play as well as the language-model agents and the reference players? | Against `rule` and `random`, each decision agent's win rate is not distinguishable from that of the typed agents (batch 2). It is better than `random`. `lookahead` and `rule` are each better than it or not distinguishable from it; it is better than neither. |
+| Q9 | How many invalid moves does a decision agent make? | 0 malformed or illegal decisions apart from `tooManyOptions` cases, and those under 1% of decisions. |
+
+Secondary, exploratory: median time per decision, cost per game, and how the chosen action's
+probability relates to the outcome of the game (calibration; no expectation stated).
+
 ## Versions
 
 - v1, 2026-11-19: first version.
+- v2, 2026-11-19: adds the decision agent type, final batch 4 and questions Q8-Q9 (amendment above).

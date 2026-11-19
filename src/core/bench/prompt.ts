@@ -2,7 +2,8 @@
 // plain objects out: the network call lives in bench/llm.ts. Both LLM agents get the same rules and
 // the same state text; only the way they answer differs:
 //   free   answers in free text with one JSON action, which the harness checks;
-//   typed  picks one numbered legal action, with output constrained to a JSON schema.
+//   typed  picks one numbered legal action, with output constrained to a JSON schema;
+//   decision  a decision model scores the numbered legal actions as the options of one choice question.
 import { describeObservation } from '../observation';
 import type { Observation } from '../engine';
 import { UNIT_STATS, UNIT_TYPES } from '../rules';
@@ -59,6 +60,20 @@ export function typedPrompt(view: Observation, legal: Action[]): { system: strin
   return {
     system: `${RULES_TEXT}\n\nChoose one of the numbered legal actions. Reply as JSON: {"choice":"N"}.`,
     user: `${stateText(view)}\n\nLegal actions:\n${legal.map((a, i) => `${i}: ${JSON.stringify(a)}`).join('\n')}`,
+  };
+}
+
+/** The System One request body (without the model) for a decision agent: same rules and state text as the others. */
+export function decisionRequest(view: Observation, legal: Action[]): Record<string, unknown> {
+  return {
+    state: `${RULES_TEXT}\n\n${stateText(view)}`,
+    questions: {
+      move: {
+        type: 'choice',
+        instructions: `You are player ${view.you}. Choose the legal action that best helps you win the game.`,
+        criteria: Object.fromEntries(legal.map((a, i) => [String(i), JSON.stringify(a)])),
+      },
+    },
   };
 }
 

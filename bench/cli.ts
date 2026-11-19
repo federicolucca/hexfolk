@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { BASELINES } from '../src/core/bench/baselines';
 import { type GameLog, parseLog, rebuildFromLog, runGame, serializeLog, type StepAgent } from '../src/core/bench/harness';
-import { LlmStepAgent, type LlmMode } from './llm';
+import { DecisionStepAgent, LlmStepAgent, type LlmMode } from './llm';
 import { CSV_HEADER, csvRow, renderResults } from './report';
 
 export const SEED_SETS: Readonly<Record<string, number>> = { tune: 1, test: 100_001 };
@@ -21,7 +21,9 @@ export function makeAgent(name: string, seed: number, seat: number): StepAgent {
   if (baseline) return baseline(seed, seat);
   const llm = /^([a-z0-9]+)-(free|typed)$/.exec(name);
   if (llm) return new LlmStepAgent(llm[1] as string, llm[2] as LlmMode, seed);
-  throw new Error(`unknown agent ${name}; baselines: ${Object.keys(BASELINES).join(', ')}; models: <alias>-free or <alias>-typed`);
+  const decision = /^([a-z0-9]+)-decision$/.exec(name);
+  if (decision) return new DecisionStepAgent(decision[1] as string);
+  throw new Error(`unknown agent ${name}; baselines: ${Object.keys(BASELINES).join(', ')}; models: <alias>-free, <alias>-typed or <alias>-decision`);
 }
 
 function meta(): Record<string, string> {

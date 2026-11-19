@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { LlmStepAgent } from '../bench/llm';
+import { DecisionStepAgent, LlmStepAgent, MAX_DECISION_OPTIONS } from '../bench/llm';
 import { choiceSchema, extractJson, resolveChoice, stateText, typedPrompt } from '../src/core/bench/prompt';
 import { legalActions, newGame, observe } from '../src/core/engine';
 
@@ -45,6 +45,53 @@ describe('language-model agents', () => {
     expect(f.calls[0]!.headers.Authorization).toBe(`Bearer ${SECRET}`);
     vi.stubEnv('OPENROUTER_API_KEY', '');
     await expect(new LlmStepAgent('llama8b', 'free', 1, f.fn).choose(observe(state, 0), legal)).rejects.toThrow(/not set/);
+  });
+});
+
+describe('decision agents', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  function decisionFetch(choice: string) {
+    const calls: Record<string, unknown>[] = [];
+    const fn = vi.fn(async (_url: string, init: { body: string }) => {
+      calls.push(JSON.parse(init.body));
+      const data = { answers: { move: { type: 'choice', choice, probabilities: { [choice]: 0.9 }, confidence: 0.9 } }, usage: { input_tokens: 300, output_tokens: 0, cost: 0.00003 } };
+      return new Response(JSON.stringify(data), { status: 200 });
+    });
+    return { fn: fn as unknown as typeof fetch, calls };
+  }
+
+  it('sends the legal actions as the options of one choice question and plays the chosen one', async () => {
+    vi.stubEnv('OPENROUTER_API_KEY', SECRET);
+    const f = decisionFetch('1');
+    const d = await new DecisionStepAgent('gemini', f.fn).choose(observe(state, 0), legal);
+    expect(d.action).toEqual(legal[1]);
+    expect(d.usage).toEqual({ tokensIn: 300, tokensOut: 0, costUsd: 0.00003 });
+    expect(d.raw).toBe('{"choice":"1","p":0.9}');
+    const q = (f.calls[0]!.questions as { move: { type: string; criteria: Record<string, string> } }).move;
+    expect(f.calls[0]!.model).toBe('google/gemini-decision-1');
+    expect(q.type).toBe('choice');
+    expect(Object.keys(q.criteria)).toHaveLength(legal.length);
+  });
+
+  it('an answer outside the options stays visibly wrong', async () => {
+    vi.stubEnv('OPENROUTER_API_KEY', SECRET);
+    const d = await new DecisionStepAgent('gemini', decisionFetch('9999').fn).choose(observe(state, 0), legal);
+    expect(d.action).toEqual({ invalidChoice: '9999' });
+  });
+
+  it('does not call the model when there are more legal actions than options allowed', async () => {
+    vi.stubEnv('OPENROUTER_API_KEY', SECRET);
+    const f = decisionFetch('0');
+    const many = Array.from({ length: MAX_DECISION_OPTIONS + 1 }, () => legal[0]!);
+    const d = await new DecisionStepAgent('gemini', f.fn).choose(observe(state, 0), many);
+    expect(d.action).toEqual({ tooManyOptions: MAX_DECISION_OPTIONS + 1 });
+    expect(f.calls).toHaveLength(0);
+  });
+
+  it('each provider reads its own key from the environment', async () => {
+    vi.stubEnv('BESPOKE_API_KEY', '');
+    await expect(new DecisionStepAgent('nimble', decisionFetch('0').fn).choose(observe(state, 0), legal)).rejects.toThrow(/BESPOKE_API_KEY is not set/);
   });
 });
 

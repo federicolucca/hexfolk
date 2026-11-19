@@ -2,7 +2,7 @@
 // environment variable only; it is never written to a log, a file or an error message.
 import type { Observation } from '../src/core/engine';
 import type { Decision, StepAgent, Usage } from '../src/core/bench/harness';
-import { choiceSchema, extractJson, freePrompt, resolveChoice, typedPrompt } from '../src/core/bench/prompt';
+import { choiceSchema, decisionRequest, extractJson, freePrompt, resolveChoice, typedPrompt } from '../src/core/bench/prompt';
 import type { Action } from '../src/core/state';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
@@ -89,5 +89,76 @@ export class LlmStepAgent implements StepAgent {
       await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
     }
     throw new Error(`OpenRouter call failed: ${last}`);
+  }
+}
+
+// Decision agents (protocol v2): a native decision model ("System One" API) scores the legal actions
+// as the options of one choice question and the agent plays the most likely one. No text is
+// generated, so a reply can only name one of the options or fail.
+interface DecisionProvider {
+  endpoint: string;
+  model: string;
+  keyVar: string;
+}
+
+export const DECISION_MODELS: Readonly<Record<string, DecisionProvider>> = {
+  gemini: { endpoint: 'https://openrouter.ai/api/v1/systemone', model: 'google/gemini-decision-1', keyVar: 'OPENROUTER_API_KEY' },
+  nimble: { endpoint: 'https://api.bespokelabs.ai/v1/systemone', model: 'nimble-v4-max', keyVar: 'BESPOKE_API_KEY' },
+};
+
+/** Most options one choice question may carry; a position with more is not sent and is logged as malformed. */
+export const MAX_DECISION_OPTIONS = 255;
+
+interface DecisionResponse {
+  answers?: Record<string, { choice?: string; probabilities?: Record<string, number> }>;
+  usage?: { input_tokens?: number; output_tokens?: number; cost?: number };
+  error?: { message?: string; code?: number };
+}
+
+export class DecisionStepAgent implements StepAgent {
+  readonly name: string;
+  private readonly provider: DecisionProvider;
+  private readonly fetchFn: typeof fetch;
+  constructor(alias: string, fetchFn: typeof fetch = fetch) {
+    const provider = DECISION_MODELS[alias];
+    if (!provider) throw new Error(`unknown decision model ${alias}; known: ${Object.keys(DECISION_MODELS).join(', ')}`);
+    this.provider = provider;
+    this.fetchFn = fetchFn;
+    this.name = `${alias}-decision`;
+  }
+
+  async choose(view: Observation, legal: Action[]): Promise<Decision> {
+    if (legal.length > MAX_DECISION_OPTIONS) return { action: { tooManyOptions: legal.length }, raw: `not sent: ${legal.length} legal actions` };
+    const body = { model: this.provider.model, ...decisionRequest(view, legal) };
+    const data = await this.post(body);
+    const answer = data.answers?.move;
+    const choice = answer?.choice ?? '';
+    const p = answer?.probabilities?.[choice];
+    const usage: Usage = { tokensIn: data.usage?.input_tokens ?? 0, tokensOut: data.usage?.output_tokens ?? 0, costUsd: data.usage?.cost ?? 0 };
+    // The chosen option's probability is kept in the raw reply for the exploratory calibration measure.
+    return { action: resolveChoice(JSON.stringify({ choice }), legal), raw: JSON.stringify({ choice, p }), usage };
+  }
+
+  private async post(body: Record<string, unknown>): Promise<DecisionResponse> {
+    const key = process.env[this.provider.keyVar];
+    if (!key) throw new Error(`${this.provider.keyVar} is not set`);
+    let last = '';
+    for (let attempt = 0; attempt < RETRIES; attempt++) {
+      try {
+        const res = await this.fetchFn(this.provider.endpoint, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-Title': 'hexfolk-bench' },
+          body: JSON.stringify(body),
+        });
+        const data = (await res.json()) as DecisionResponse;
+        if (res.ok && !data.error) return data;
+        last = `HTTP ${res.status}: ${data.error?.message ?? 'no message'}`;
+        if (res.status < 500 && res.status !== 429) break;
+      } catch (err) {
+        last = err instanceof Error ? err.message : String(err);
+      }
+      await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+    }
+    throw new Error(`decision call failed: ${last}`);
   }
 }
