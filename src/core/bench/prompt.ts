@@ -21,7 +21,7 @@ Each turn you get stars from your cities. Spend them to train units in your citi
 hunting, fishing, riding, climbing, archery, fortification), harvest resources next to your cities (2 stars, +1 population),
 build roads (2 stars) or walls (needs fortification).
 Units: ${unitLine}.
-A unit standing on a city it does not own can capture it. Attacks are deterministic: stronger, healthier units deal more damage.
+A city can train a unit only when no unit stands on its tile. A unit standing on a city it does not own can capture it. Attacks are deterministic: stronger, healthier units deal more damage.
 You act one action at a time; the turn passes when you send end_turn. An invalid action ends your turn.`;
 
 export const ACTION_FORMAT = `Actions (JSON):
