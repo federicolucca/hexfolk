@@ -17,6 +17,18 @@ export const MODELS: Readonly<Record<string, string>> = {
   ministral3b: 'mistralai/ministral-3b-2512',
 };
 
+/** Local models served by Ollama (OpenAI-compatible API) at $OLLAMA_URL, e.g. http://host:11434. No key, no cost. */
+export const LOCAL_MODELS: Readonly<Record<string, string>> = {
+  localllama8b: 'llama3.1:8b',
+  localqwen7b: 'qwen2.5:7b',
+};
+
+function ollamaUrl(): string {
+  const url = process.env.OLLAMA_URL;
+  if (!url) throw new Error('OLLAMA_URL is not set');
+  return url.replace(/\/+$/, '');
+}
+
 interface ChatResponse {
   choices?: { message?: { content?: string | null } }[];
   usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number };
@@ -40,14 +52,14 @@ export class LlmStepAgent implements StepAgent {
     this.mode = mode;
     this.seed = seed;
     this.fetchFn = fetchFn;
-    if (!MODELS[alias]) throw new Error(`unknown model ${alias}; known: ${Object.keys(MODELS).join(', ')}`);
+    if (!MODELS[alias] && !LOCAL_MODELS[alias]) throw new Error(`unknown model ${alias}; known: ${[...Object.keys(MODELS), ...Object.keys(LOCAL_MODELS)].join(', ')}`);
     this.name = `${alias}-${mode}`;
   }
 
   async choose(view: Observation, legal: Action[]): Promise<Decision> {
     const prompt = this.mode === 'free' ? freePrompt(view) : typedPrompt(view, legal);
     const body: Record<string, unknown> = {
-      model: MODELS[this.alias],
+      model: MODELS[this.alias] ?? LOCAL_MODELS[this.alias],
       messages: [
         { role: 'system', content: prompt.system },
         { role: 'user', content: prompt.user },
@@ -59,7 +71,7 @@ export class LlmStepAgent implements StepAgent {
     };
     if (this.mode === 'typed') {
       body.response_format = { type: 'json_schema', json_schema: { name: 'choice', strict: true, schema: choiceSchema(legal.length) } };
-      body.provider = { require_parameters: true };
+      if (!LOCAL_MODELS[this.alias]) body.provider = { require_parameters: true };
     }
     const data = await this.post(body);
     const raw = data.choices?.[0]?.message?.content ?? '';
@@ -70,13 +82,16 @@ export class LlmStepAgent implements StepAgent {
 
   /** Retries network and server errors (not the model's answers); a reply that never comes is an agent error. */
   private async post(body: Record<string, unknown>): Promise<ChatResponse> {
-    const key = apiKey();
+    const local = Boolean(LOCAL_MODELS[this.alias]);
+    const endpoint = local ? `${ollamaUrl()}/v1/chat/completions` : ENDPOINT;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-Title': 'hexfolk-bench' };
+    if (!local) headers.Authorization = `Bearer ${apiKey()}`;
     let last = '';
     for (let attempt = 0; attempt < RETRIES; attempt++) {
       try {
-        const res = await this.fetchFn(ENDPOINT, {
+        const res = await this.fetchFn(endpoint, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-Title': 'hexfolk-bench' },
+          headers,
           body: JSON.stringify(body),
         });
         const data = (await res.json()) as ChatResponse;
@@ -104,6 +119,8 @@ interface DecisionProvider {
 export const DECISION_MODELS: Readonly<Record<string, DecisionProvider>> = {
   gemini: { endpoint: 'https://openrouter.ai/api/v1/systemone', model: 'google/gemini-decision-1', keyVar: 'OPENROUTER_API_KEY' },
   nimble: { endpoint: 'https://api.bespokelabs.ai/v1/systemone', model: 'nimble-v4-max', keyVar: 'BESPOKE_API_KEY' },
+  // Open-weights Nimble on the local Ollama server ($OLLAMA_URL); the model tag is set when the server is up.
+  localnimble: { endpoint: 'ollama:/v1/systemone', model: process.env.OLLAMA_NIMBLE_TAG ?? 'nimble', keyVar: '' },
 };
 
 /** Most options one choice question may carry; a position with more is not sent and is logged as malformed. */
@@ -143,14 +160,20 @@ export class DecisionStepAgent implements StepAgent {
   }
 
   private async post(body: Record<string, unknown>): Promise<DecisionResponse> {
-    const key = process.env[this.provider.keyVar];
-    if (!key) throw new Error(`${this.provider.keyVar} is not set`);
+    const local = this.provider.endpoint.startsWith('ollama:');
+    const endpoint = local ? `${ollamaUrl()}${this.provider.endpoint.slice('ollama:'.length)}` : this.provider.endpoint;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-Title': 'hexfolk-bench' };
+    if (!local) {
+      const key = process.env[this.provider.keyVar];
+      if (!key) throw new Error(`${this.provider.keyVar} is not set`);
+      headers.Authorization = `Bearer ${key}`;
+    }
     let last = '';
     for (let attempt = 0; attempt < RETRIES; attempt++) {
       try {
-        const res = await this.fetchFn(this.provider.endpoint, {
+        const res = await this.fetchFn(endpoint, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-Title': 'hexfolk-bench' },
+          headers,
           body: JSON.stringify(body),
         });
         const data = (await res.json()) as DecisionResponse;

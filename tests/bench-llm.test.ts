@@ -103,6 +103,27 @@ describe('decision agents', () => {
   });
 });
 
+describe('local models', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('a local typed agent calls $OLLAMA_URL without any key', async () => {
+    vi.stubEnv('OLLAMA_URL', 'http://gpu-pc:11434/');
+    vi.stubEnv('OPENROUTER_API_KEY', '');
+    const urls: string[] = [];
+    const heads: Record<string, string>[] = [];
+    const fn = vi.fn(async (url: string, init: { headers: Record<string, string> }) => {
+      urls.push(url);
+      heads.push(init.headers);
+      return new Response(JSON.stringify({ choices: [{ message: { content: '{"choice":"0"}' } }], usage: { prompt_tokens: 10, completion_tokens: 3 } }), { status: 200 });
+    }) as unknown as typeof fetch;
+    const d = await new LlmStepAgent('localllama8b', 'typed', 1, fn).choose(observe(state, 0), legal);
+    expect(d.action).toEqual(legal[0]);
+    expect(urls[0]).toBe('http://gpu-pc:11434/v1/chat/completions');
+    expect(heads[0]!.Authorization).toBeUndefined();
+    expect(d.usage?.costUsd).toBe(0);
+  });
+});
+
 describe('language-model prompts', () => {
   it('the state text names the seat, the map and the resources', () => {
     const text = stateText(observe(state, 0));
