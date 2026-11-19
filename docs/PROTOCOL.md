@@ -138,3 +138,16 @@ probability relates to the outcome of the game (calibration; no expectation stat
 
 - v1, 2026-11-19: first version.
 - v2, 2026-11-19: adds the decision agent type, final batch 4 and questions Q8-Q9 (amendment above).
+- v2.1, 2026-11-19 (recorded after the fact, before any language-model game on the test set):
+  - f44cad3: a decision agent plays a forced move (one legal action) without calling the model,
+    because Bespoke's API refuses a one-option choice. No move changes.
+  - 483e79c: a batch stops on the first HTTP 402 (out of credit) and does not record that game.
+    Batch 4 run 1 was invalid for that reason: see docs/bench/invalid-runs.md.
+  - Budget flag (`--budget-usd`): owner cap of $5 in total for paid calls from 2026-11-19. A run
+    starts no new game once its spend reaches the budget. A batch cut by it is reported as
+    incomplete.
+  - ece32ad: the shared rules text given to every language-model agent now states that a city can
+    train a unit only when its tile is empty. Reason: in the pilot on tuning seeds 1-2 (16 games),
+    most of the free agents' illegal moves (150 of 239) were training in an occupied city, a rule
+    the text never stated. A re-pilot on tuning seed 1 still showed only invalid moves for the free
+    agents; nothing further was changed. Made before any language-model game on the test set.
