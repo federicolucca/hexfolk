@@ -1,7 +1,7 @@
 // hexfolk benchmark command line. Built for Node by vite.node.config.ts.
 //   npm run bench -- play --seed 7 --a rule --b random [--out game.jsonl]   one game, no graphics
 //   npm run bench -- replay game.jsonl                                       rebuild a game from its log and check it
-//   npm run bench -- run --set tune --seeds 50 --pairs rule:random,... --out DIR [--parallel 4] [--dry-run]
+//   npm run bench -- run --set tune --seeds 50 --pairs rule:random,... --out DIR [--parallel 4] [--budget-usd 5] [--dry-run]
 //   npm run bench -- report DIR                                              tables and charts from DIR/results.csv
 // Seed sets are fixed in docs/PROTOCOL.md: "tune" for development, "test" held out for the final numbers.
 import { execSync } from 'node:child_process';
@@ -120,8 +120,18 @@ async function run(f: Map<string, string>): Promise<void> {
   let next = 0;
   let finished = 0;
   let stopped = false;
+  // Hard spending stop: no new game starts once this run has spent the budget (games in flight finish).
+  const budget = f.has('budget-usd') ? Number(f.get('budget-usd')) : Infinity;
+  if (Number.isNaN(budget)) throw new Error('--budget-usd needs a number');
+  let spent = 0;
   const worker = async () => {
     while (!stopped && next < todo.length) {
+      if (spent >= budget) {
+        stopped = true;
+        console.error(`Budget of $${budget} reached ($${spent.toFixed(4)} spent): batch stopped.`);
+        process.exitCode = 3;
+        return;
+      }
       const job = todo[next++] as Job;
       const agents: [StepAgent, StepAgent] = [makeAgent(job.seats[0], job.seed, 0), makeAgent(job.seats[1], job.seed, 1)];
       const log = await runGame({ seed: job.seed, agents, meta: info });
@@ -134,11 +144,12 @@ async function run(f: Map<string, string>): Promise<void> {
         process.exitCode = 2;
         return;
       }
+      spent += log.result.seats.reduce((n, s) => n + s.costUsd, 0);
       const file = join('logs', `${job.id}.jsonl`);
       await writeFile(join(dir, file), serializeLog(log));
       await appendFile(csv, `${csvRow(job.id, job.set, log, file)}\n`);
       finished++;
-      if (finished % 10 === 0 || finished === todo.length) console.log(`${finished}/${todo.length} games`);
+      if (finished % 10 === 0 || finished === todo.length) console.log(`${finished}/${todo.length} games, $${spent.toFixed(4)} spent`);
     }
   };
   await Promise.all(Array.from({ length: Math.max(1, parallel) }, worker));
