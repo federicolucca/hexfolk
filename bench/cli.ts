@@ -119,11 +119,21 @@ async function run(f: Map<string, string>): Promise<void> {
   const info = meta();
   let next = 0;
   let finished = 0;
+  let stopped = false;
   const worker = async () => {
-    while (next < todo.length) {
+    while (!stopped && next < todo.length) {
       const job = todo[next++] as Job;
       const agents: [StepAgent, StepAgent] = [makeAgent(job.seats[0], job.seed, 0), makeAgent(job.seats[1], job.seed, 1)];
       const log = await runGame({ seed: job.seed, agents, meta: info });
+      if (stopped) return;
+      // An exhausted account (HTTP 402) is an outage, not play: stop the batch and keep that game out of the
+      // results, so the batch can be resumed or rerun once credit is added (docs/PROTOCOL.md, test set).
+      if (log.moves.some((m) => m.reason?.includes('HTTP 402'))) {
+        stopped = true;
+        console.error(`Out of API credit during ${job.id}: batch stopped, that game is not recorded.`);
+        process.exitCode = 2;
+        return;
+      }
       const file = join('logs', `${job.id}.jsonl`);
       await writeFile(join(dir, file), serializeLog(log));
       await appendFile(csv, `${csvRow(job.id, job.set, log, file)}\n`);
