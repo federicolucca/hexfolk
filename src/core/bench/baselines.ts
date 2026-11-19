@@ -6,6 +6,8 @@
 //              with the best evaluation, where the evaluation also counts the damage the opponent
 //              could deal on its next turn (one turn ahead). Ends the turn when nothing improves.
 //   greedy     the game's own tuned AI (src/core/ai/greedy.ts), wrapped to play step by step.
+//   search     the ceiling: rollout search over single actions with the greedy AI as the model of
+//              both sides, under a fixed node budget (src/core/bench/search.ts).
 import { GreedyAgent } from '../ai/greedy';
 import type { Difficulty } from '../ai/greedy';
 import { unitById } from '../board';
@@ -17,6 +19,7 @@ import { createRng } from '../rng';
 import { UNIT_STATS } from '../rules';
 import type { Action, GameState, HexRef } from '../state';
 import type { Decision, StepAgent } from './harness';
+import { SearchStepAgent } from './search';
 
 export class RandomStepAgent implements StepAgent {
   readonly name = 'random';
@@ -141,4 +144,5 @@ export const BASELINES: Readonly<Record<string, (seed: number, seat: number) => 
   rule: () => new RuleStepAgent(),
   lookahead: () => new LookaheadStepAgent(),
   'greedy-normal': () => new GreedyStepAgent('normal'),
+  search: () => new SearchStepAgent(),
 };

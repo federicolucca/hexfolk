@@ -103,7 +103,7 @@ describe('reference players', () => {
       const bad = log.result.seats.flatMap((s) => Object.values(s.bad)).reduce((n, x) => n + x, 0);
       expect(bad, name).toBe(0);
     }
-  });
+  }, 60_000); // the search player plays itself here: a few seconds per game
 
   it('the rule player and the short search both beat random over a few seeds', async () => {
     for (const make of [() => new RuleStepAgent(), () => new LookaheadStepAgent()]) {
