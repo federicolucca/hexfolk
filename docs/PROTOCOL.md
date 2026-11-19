@@ -134,6 +134,34 @@ seeds 100001-100025, both seats (50 games per pairing, 150 games per decision ag
 Secondary, exploratory: median time per decision, cost per game, and how the chosen action's
 probability relates to the outcome of the game (calibration; no expectation stated).
 
+## Amendment v3 (2026-11-19)
+
+Written and committed before any game of the `search` player on the test set. At this point final
+batches 1 to 4 had already been run; nothing below changes them or their expectations.
+
+**Reason.** The strongest v1 reference player (`greedy-normal`) is the game's own AI. A ceiling
+well above it shows how far every other agent is from good play, so the gap the models leave is
+measured against a known strong player, not only against weak ones.
+
+**Change: a fifth reference player, `search`** (`src/core/bench/search.ts`, commit 2b321bf). A
+deterministic rollout search: for each shortlisted action it plays the game forward 5 turns with
+the greedy AI on its side and, for the opponent, both the greedy AI and `rule`, keeping the worse
+result; it plays the best action. Fixed node budget, no wall-clock limit, no randomness. It was
+tuned on tuning seeds only (see docs/bench/tune-search.md) and is frozen at that commit. On tuning
+seeds 101-150 it beat `rule`, `lookahead` and `greedy-normal` in 85-93% of games, at about 62 ms
+per decision on boxer.
+
+**Final batch 5 (test set).** `search` against `random`, `rule`, `lookahead` and `greedy-normal`,
+on seeds 100001-100100, both seats (200 games per pairing, 800 games). No paid calls.
+
+**Question and expectation (written before any `search` game on the test set).**
+
+| # | Question | Expectation |
+| --- | --- | --- |
+| Q10s | Is `search` a ceiling above the other reference players? | `search` is better than each of `random`, `rule`, `lookahead` and `greedy-normal` (its win rate's 95% CI above 50% in each pairing). |
+
+Secondary: time per decision and per game (no expectation stated).
+
 ## Versions
 
 - v1, 2026-11-19: first version.
@@ -151,3 +179,4 @@ probability relates to the outcome of the game (calibration; no expectation stat
     most of the free agents' illegal moves (150 of 239) were training in an occupied city, a rule
     the text never stated. A re-pilot on tuning seed 1 still showed only invalid moves for the free
     agents; nothing further was changed. Made before any language-model game on the test set.
+- v3, 2026-11-19: adds the `search` reference player, final batch 5 and question Q10s (amendment above).
