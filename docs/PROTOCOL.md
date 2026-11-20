@@ -186,7 +186,30 @@ only.
 | Q15 | `localnimble-decision` | **Dropped**: the Ollama server does not serve `/v1/systemone` and has no Nimble model (checked 2026-11-20). Nimble stays on Bespoke's API (batch 4 run 2). |
 | Q16 | Cost | Local API cost $0. Report GPU latency per decision and wall time per game next to hosted cost per game. |
 
-Pilot settings (timeout, seeds) are added below when fixed, in a commit made before the first test game.
+**Pilot settings, fixed 2026-11-20 before the first local test game** (pilot: docs/bench/pilot-local.md,
+36 games on tuning seeds 1-2, commit 9614af3):
+
+- **Timeout:** 60 s per decision, the harness default, unchanged. Pilot p99 latency was about 5 s
+  and the slowest decision 22.7 s; no decision timed out.
+- **Test seeds:** 100001-100025 (25 seeds, the same as hosted batches 2-3). 100 seeds would take
+  about 27 h of wall time on this GPU, over the 6-hour limit; 25 seeds take about 7 h.
+- **Final batch 6** (set `test`, `--parallel 2`, every pairing on every seed from both seats, so 50
+  games per pairing and 500 games in all):
+  - `localllama8b-free`, `localllama8b-typed`, `localqwen7b-free`, `localqwen7b-typed`, each vs
+    `random` and vs `rule` (400 games; Q10, Q12, Q13, Q14, Q16);
+  - `localllama8b-typed` vs `search` and `localqwen7b-typed` vs `search` (100 games; Q13).
+
+  ```
+  npm run bench -- run --set test --seeds 25 --out bench-out/batch6 --parallel 2 --pairs \
+    localllama8b-free:random,localllama8b-free:rule,localllama8b-typed:random,localllama8b-typed:rule,\
+  localqwen7b-free:random,localqwen7b-free:rule,localqwen7b-typed:random,localqwen7b-typed:rule,\
+  localllama8b-typed:search,localqwen7b-typed:search
+  ```
+- **Q11:** 5 test-seed local games from batch 6 are replayed twice: from their logs (`bench replay`)
+  and by seed (the same seed and agents played again), and the action lists compared.
+- **Skipped for budget** (the owner's $5 cap for paid calls is used up; zero paid calls in v4): the
+  Q10 direct match `localllama8b-typed` vs hosted `llama8b-typed`, and Q11's hosted replays. Q10 is
+  answered only through the hosted batch 2 rows against `random` and `rule`, same seeds.
 
 ## Versions
 
@@ -207,3 +230,5 @@ Pilot settings (timeout, seeds) are added below when fixed, in a commit made bef
     agents; nothing further was changed. Made before any language-model game on the test set.
 - v3, 2026-11-19: adds the `search` reference player, final batch 5 and question Q10s (amendment above).
 - v4, 2026-11-20: adds local agents over Ollama and questions Q10-Q16, Q15 dropped (amendment above).
+- v4.1, 2026-11-20: pilot settings of v4 fixed (timeout, test seeds, batch 6 pairings, skipped
+  paid parts), before any local test game.
