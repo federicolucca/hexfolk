@@ -162,6 +162,32 @@ on seeds 100001-100100, both seats (200 games per pairing, 800 games). No paid c
 
 Secondary: time per decision and per game (no expectation stated).
 
+## Amendment v4 (2026-11-20): local agents
+
+Drafted by Paper on 2026-11-19, before any batch 2-3 result; merged and committed before any local
+game (pilot or test). Nothing below changes batches 1 to 5 or their expectations.
+
+**Setup.** Local models served by Ollama 0.14.2 (OpenAI-compatible API, `$OLLAMA_URL`) on an
+RTX 2080 Ti 11 GB, `OLLAMA_NUM_PARALLEL=2`: `localllama8b` = `llama3.1:8b`, `localqwen7b` =
+`qwen2.5:7b` (both Q4), each as a free and a typed agent. Temperature 0, the same prompts as
+ece32ad, the same harness rules, except the per-decision timeout below.
+
+**Tuning pilot, then fixed here before any test game:** the per-decision timeout (set to fit the
+GPU, reported) and the test seeds (at least 25, 100 if the GPU allows). The pilot uses tuning seeds
+only.
+
+| # | Question | Expectation |
+| --- | --- | --- |
+| Q10 | Local vs hosted, same model (`localllama8b` vs hosted `llama8b`, free and typed) | Win rates against `random` and `rule` not distinguishable; invalid-move rates not distinguishable. Direct match `localllama8b-typed` vs `llama8b-typed`: not distinguishable from 50%. |
+| Q11 | Determinism | Local agents replay identically. Exploratory: 5 test-seed games replayed with the same seed give identical action lists. Hosted: not guaranteed; report 5 replays if within budget, otherwise skip. |
+| Q12 | `localqwen7b` vs `localllama8b` (typed) | Not distinguishable against `random` and `rule`. |
+| Q13 | Local typed agents | Better than `random`; `rule` better; `search` better. |
+| Q14 | Local free agents | Invalid moves above 50% of decisions (stated knowing the tuning re-pilot of the hosted free agents); against `random` not distinguishable or worse. |
+| Q15 | `localnimble-decision` | **Dropped**: the Ollama server does not serve `/v1/systemone` and has no Nimble model (checked 2026-11-20). Nimble stays on Bespoke's API (batch 4 run 2). |
+| Q16 | Cost | Local API cost $0. Report GPU latency per decision and wall time per game next to hosted cost per game. |
+
+Pilot settings (timeout, seeds) are added below when fixed, in a commit made before the first test game.
+
 ## Versions
 
 - v1, 2026-11-19: first version.
@@ -180,3 +206,4 @@ Secondary: time per decision and per game (no expectation stated).
     the text never stated. A re-pilot on tuning seed 1 still showed only invalid moves for the free
     agents; nothing further was changed. Made before any language-model game on the test set.
 - v3, 2026-11-19: adds the `search` reference player, final batch 5 and question Q10s (amendment above).
+- v4, 2026-11-20: adds local agents over Ollama and questions Q10-Q16, Q15 dropped (amendment above).
