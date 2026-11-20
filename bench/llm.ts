@@ -4,12 +4,28 @@ import type { Observation } from '../src/core/engine';
 import type { Decision, StepAgent, Usage } from '../src/core/bench/harness';
 import { choiceSchema, decisionRequest, extractJson, freePrompt, resolveChoice, typedPrompt } from '../src/core/bench/prompt';
 import type { Action } from '../src/core/state';
+import { createRng, toSeed } from '../src/core/rng';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-const MAX_TOKENS = { free: 200, typed: 20 } as const;
+const MAX_TOKENS = { free: 200, typed: 20, 'typed-shuffled': 20 } as const;
 const RETRIES = 3;
 
-export type LlmMode = 'free' | 'typed';
+export type LlmMode = 'free' | 'typed' | 'typed-shuffled';
+
+/**
+ * The display order for one typed-shuffled decision (protocol v5): a permutation of 0..n-1 drawn
+ * from the game seed and the agent's decision index, so it is fixed per game and logged.
+ * Shown index i is legal action order[i].
+ */
+export function shuffledOrder(n: number, seed: number, decision: number): number[] {
+  const rng = createRng(Math.imul(toSeed(seed), 0x9e3779b1) ^ Math.imul(decision + 1, 0x85ebca6b));
+  const order = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(rng.next() * (i + 1));
+    [order[i], order[j]] = [order[j] as number, order[i] as number];
+  }
+  return order;
+}
 
 /** The models in the benchmark: small and cheap, all with JSON-schema output on OpenRouter. */
 export const MODELS: Readonly<Record<string, string>> = {
@@ -47,6 +63,7 @@ export class LlmStepAgent implements StepAgent {
   readonly mode: LlmMode;
   private readonly seed: number;
   private readonly fetchFn: typeof fetch;
+  private decisions = 0;
   constructor(alias: string, mode: LlmMode, seed: number, fetchFn: typeof fetch = fetch) {
     this.alias = alias;
     this.mode = mode;
@@ -57,7 +74,10 @@ export class LlmStepAgent implements StepAgent {
   }
 
   async choose(view: Observation, legal: Action[]): Promise<Decision> {
-    const prompt = this.mode === 'free' ? freePrompt(view) : typedPrompt(view, legal);
+    const order = this.mode === 'typed-shuffled' ? shuffledOrder(legal.length, this.seed, this.decisions) : undefined;
+    this.decisions++;
+    const shown = order ? order.map((i) => legal[i] as Action) : legal;
+    const prompt = this.mode === 'free' ? freePrompt(view) : typedPrompt(view, shown);
     const body: Record<string, unknown> = {
       model: MODELS[this.alias] ?? LOCAL_MODELS[this.alias],
       messages: [
@@ -69,15 +89,15 @@ export class LlmStepAgent implements StepAgent {
       max_tokens: MAX_TOKENS[this.mode],
       usage: { include: true },
     };
-    if (this.mode === 'typed') {
+    if (this.mode !== 'free') {
       body.response_format = { type: 'json_schema', json_schema: { name: 'choice', strict: true, schema: choiceSchema(legal.length) } };
       if (!LOCAL_MODELS[this.alias]) body.provider = { require_parameters: true };
     }
     const data = await this.post(body);
     const raw = data.choices?.[0]?.message?.content ?? '';
     const usage: Usage = { tokensIn: data.usage?.prompt_tokens ?? 0, tokensOut: data.usage?.completion_tokens ?? 0, costUsd: data.usage?.cost ?? 0 };
-    const action = this.mode === 'free' ? extractJson(raw) : resolveChoice(raw, legal);
-    return { action, raw, usage };
+    const action = this.mode === 'free' ? extractJson(raw) : resolveChoice(raw, shown);
+    return { action, raw, usage, ...(order ? { order } : {}) };
   }
 
   /** Retries network and server errors (not the model's answers); a reply that never comes is an agent error. */

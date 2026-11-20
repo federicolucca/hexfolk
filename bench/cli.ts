@@ -19,11 +19,11 @@ export const RULES_VERSION = 'v1.0.0';
 export function makeAgent(name: string, seed: number, seat: number): StepAgent {
   const baseline = BASELINES[name];
   if (baseline) return baseline(seed, seat);
-  const llm = /^([a-z0-9]+)-(free|typed)$/.exec(name);
+  const llm = /^([a-z0-9]+)-(free|typed|typed-shuffled)$/.exec(name);
   if (llm) return new LlmStepAgent(llm[1] as string, llm[2] as LlmMode, seed);
   const decision = /^([a-z0-9]+)-decision$/.exec(name);
   if (decision) return new DecisionStepAgent(decision[1] as string);
-  throw new Error(`unknown agent ${name}; baselines: ${Object.keys(BASELINES).join(', ')}; models: <alias>-free, <alias>-typed or <alias>-decision`);
+  throw new Error(`unknown agent ${name}; baselines: ${Object.keys(BASELINES).join(', ')}; models: <alias>-free, <alias>-typed, <alias>-typed-shuffled or <alias>-decision`);
 }
 
 function meta(): Record<string, string> {

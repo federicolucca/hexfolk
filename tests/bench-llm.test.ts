@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DecisionStepAgent, LlmStepAgent, MAX_DECISION_OPTIONS } from '../bench/llm';
+import { DecisionStepAgent, LlmStepAgent, MAX_DECISION_OPTIONS, shuffledOrder } from '../bench/llm';
 import { choiceSchema, extractJson, resolveChoice, stateText, typedPrompt } from '../src/core/bench/prompt';
 import { legalActions, newGame, observe } from '../src/core/engine';
 
@@ -27,6 +27,30 @@ describe('language-model agents', () => {
     expect(d.action).toEqual(legal[0]);
     expect(d.usage).toEqual({ tokensIn: 100, tokensOut: 5, costUsd: 0.0001 });
     expect(f.calls[0]!.body).toMatchObject({ temperature: 0, seed: 1, response_format: { type: 'json_schema' } });
+  });
+
+  it('the typed-shuffled agent shows the legal actions permuted, maps the choice back and returns the order', async () => {
+    vi.stubEnv('OLLAMA_URL', 'http://ollama.test:11434');
+    const f = fakeFetch('{"choice":"0"}');
+    const agent = new LlmStepAgent('localllama8b', 'typed-shuffled', 7, f.fn);
+    const d = await agent.choose(observe(state, 0), legal);
+    const order = shuffledOrder(legal.length, 7, 0);
+    expect(d.order).toEqual(order);
+    expect(d.action).toEqual(legal[order[0]!]);
+    const user = (f.calls[0]!.body.messages as { content: string }[])[1]!.content;
+    expect(user).toContain(`0: ${JSON.stringify(legal[order[0]!])}`);
+    expect(f.calls[0]!.body).toMatchObject({ response_format: { type: 'json_schema' } });
+    const d2 = await agent.choose(observe(state, 0), legal);
+    expect(d2.order).toEqual(shuffledOrder(legal.length, 7, 1));
+  });
+
+  it('shuffledOrder is a seeded permutation that depends on the seed and the decision index', () => {
+    const a = shuffledOrder(20, 100001, 3);
+    expect([...a].sort((x, y) => x - y)).toEqual(Array.from({ length: 20 }, (_, i) => i));
+    expect(shuffledOrder(20, 100001, 3)).toEqual(a);
+    expect(shuffledOrder(20, 100001, 4)).not.toEqual(a);
+    expect(shuffledOrder(20, 100002, 3)).not.toEqual(a);
+    expect(shuffledOrder(1, 5, 0)).toEqual([0]);
   });
 
   it('the free agent sends no schema and passes on whatever JSON the model wrote', async () => {

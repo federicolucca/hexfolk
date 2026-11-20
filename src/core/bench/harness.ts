@@ -27,6 +27,8 @@ export interface Decision {
   /** The model's raw reply, kept in the log (truncated). */
   raw?: string;
   usage?: Usage;
+  /** For an agent that showed the legal actions in another order: shown index i was legal action order[i]. */
+  order?: number[];
 }
 
 /** Anything that plays a seat one action at a time. */
@@ -65,6 +67,7 @@ export interface LogMove {
   raw?: string;
   ms: number;
   usage?: Usage;
+  order?: number[];
 }
 
 export interface SeatSummary {
@@ -156,7 +159,7 @@ export async function runGame(options: GameOptions): Promise<GameLog> {
       } else if (outcome instanceof Error) {
         move = { ...base, status: 'error', applied: END, submitted: null, reason: outcome.message.slice(0, 300) };
       } else {
-        const extra = { ...(outcome.raw !== undefined ? { raw: outcome.raw.slice(0, RAW_LIMIT) } : {}), ...(outcome.usage ? { usage: outcome.usage } : {}) };
+        const extra = { ...(outcome.raw !== undefined ? { raw: outcome.raw.slice(0, RAW_LIMIT) } : {}), ...(outcome.usage ? { usage: outcome.usage } : {}), ...(outcome.order ? { order: outcome.order } : {}) };
         const parsed = parseAction(outcome.action);
         if (!parsed.ok) {
           move = { ...base, status: 'malformed', applied: END, submitted: outcome.action ?? null, reason: parsed.error, ...extra };
