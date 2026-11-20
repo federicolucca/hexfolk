@@ -211,6 +211,36 @@ only.
   Q10 direct match `localllama8b-typed` vs hosted `llama8b-typed`, and Q11's hosted replays. Q10 is
   answered only through the hosted batch 2 rows against `random` and `rule`, same seeds.
 
+## Amendment v5 (2026-11-20): option-order control
+
+Requested by Paper with the owner's go; expectations written by Paper before any shuffled game;
+committed before any test game of batch 7. Nothing below changes batches 1 to 6.
+
+**Reason.** `legalActions()` lists `end_turn` last and the typed prompt numbers the actions in that
+order (0..n-1), so a typed agent's choices may reflect the option's position, not the action.
+
+**Change: `<alias>-typed-shuffled`** (commit 16e6c7f). Same prompt, schema and settings as the
+typed agent, but at each decision the legal list is shown in a permutation drawn from the game seed
+and the agent's decision index (`shuffledOrder` in bench/llm.ts). The permutation is logged with the
+move (`order`: shown index i is legal action `order[i]`) and the choice is mapped back. The existing
+agents are unchanged.
+
+**Baseline (batch 6 typed).** Measured on the batch 6 logs with `npm run bench -- positions
+bench-out/batch6` before any shuffled game, and reported in the paper: over valid decisions, the
+share of end_turn (= last shown), of the first shown option, and "uniform", the mean of 1/n, the
+rate expected for an option position chosen at random. The expectations below are kept as written
+and compared with that baseline.
+
+**Final batch 7 (test set).** `localllama8b-typed-shuffled` and `localqwen7b-typed-shuffled` vs
+`random`, seeds 100001-100025, both seats: 100 games. Local Ollama as in v4, `--parallel 2`, each
+model's games run as one block, 60 s timeout, zero paid calls. Pilot first on tuning seeds 1-2.
+
+| # | Question | Expectation |
+| --- | --- | --- |
+| Q17 | Does the option order drive the end_turn choices? | With shuffled order, the share of end_turn among chosen actions falls by at least 10 points for both local models, compared with batch 6 typed. |
+| Q18 | Does the option order make the typed agents lose? | Win rate vs `random` with shuffled order: not distinguishable from the batch 6 typed win rate of the same model. |
+| Q19 | Position bias (exploratory) | The share of choices at index 0 and at the last index, against the uniform rate, in both orders. |
+
 ## Versions
 
 - v1, 2026-11-19: first version.
@@ -240,3 +270,4 @@ only.
   and `rule` (both seats; seed 100007 is replayed in full). The free agents and the typed agents vs
   `search` are not continued, because their first games already gave a one-sided result (reported
   in the paper). Reported with the pairings' different game counts.
+- v5, 2026-11-20: adds the typed-shuffled agent, final batch 7 and questions Q17-Q19 (amendment above).

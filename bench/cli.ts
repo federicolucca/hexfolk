@@ -2,6 +2,7 @@
 //   npm run bench -- play --seed 7 --a rule --b random [--out game.jsonl]   one game, no graphics
 //   npm run bench -- replay game.jsonl                                       rebuild a game from its log and check it
 //   npm run bench -- run --set tune --seeds 50 --pairs rule:random,... --out DIR [--parallel 4] [--budget-usd 5] [--dry-run]
+//   npm run bench -- positions DIR...                                        typed agents: end_turn, first/last shown option vs uniform
 //   npm run bench -- report DIR                                              tables and charts from DIR/results.csv
 // Seed sets are fixed in docs/PROTOCOL.md: "tune" for development, "test" held out for the final numbers.
 import { execSync } from 'node:child_process';
@@ -9,6 +10,8 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { BASELINES } from '../src/core/bench/baselines';
+import { legalActions, newGame, step } from '../src/core/engine';
+import { readdir } from 'node:fs/promises';
 import { type GameLog, parseLog, rebuildFromLog, runGame, serializeLog, type StepAgent } from '../src/core/bench/harness';
 import { DecisionStepAgent, LlmStepAgent, type LlmMode } from './llm';
 import { CSV_HEADER, csvRow, renderResults } from './report';
@@ -164,6 +167,41 @@ async function report(dir: string | undefined): Promise<void> {
   console.log(`Wrote tables.md and winrates.svg to ${base}`);
 }
 
+/**
+ * Position bias of the typed agents (protocol v5, Q17 and Q19): over their valid decisions, the
+ * share of end_turn, of the first shown option and of the last shown option, next to the uniform
+ * rate (mean of 1/n over the same decisions). Rebuilds each game to know n.
+ */
+async function positions(dirs: string[]): Promise<void> {
+  const stats = new Map<string, { n: number; end: number; first: number; last: number; uniform: number }>();
+  for (const dir of dirs) {
+    const logDir = join(resolve(dir), 'logs');
+    for (const file of (await readdir(logDir)).filter((x) => x.endsWith('.jsonl')).sort()) {
+      const log = parseLog(await readFile(join(logDir, file), 'utf8'));
+      const typedSeats = log.header.agents.map((a, i) => (/-typed(-shuffled)?$/.test(a) ? i : -1)).filter((i) => i >= 0);
+      if (typedSeats.length === 0) continue;
+      let state = newGame({ seed: log.header.seed, players: 2, turnLimit: log.header.turnLimit });
+      for (const move of log.moves) {
+        if (typedSeats.includes(move.player) && move.status === 'ok' && move.raw !== undefined) {
+          const n = legalActions(state, move.player).length;
+          const shown = Number((JSON.parse(move.raw) as { choice: string }).choice);
+          const s = stats.get(log.header.agents[move.player] as string) ?? { n: 0, end: 0, first: 0, last: 0, uniform: 0 };
+          s.n++;
+          if (move.applied.type === 'end_turn') s.end++;
+          if (shown === 0) s.first++;
+          if (shown === n - 1) s.last++;
+          s.uniform += 1 / n;
+          stats.set(log.header.agents[move.player] as string, s);
+        }
+        state = step(state, move.player, [move.applied]).state;
+      }
+    }
+  }
+  const pct = (k: number, n: number) => `${((100 * k) / Math.max(1, n)).toFixed(1)}%`;
+  console.log('| Agent | Valid decisions | end_turn | First shown | Last shown | Uniform (mean 1/n) |\n| --- | ---: | ---: | ---: | ---: | ---: |');
+  for (const [agent, s] of [...stats].sort()) console.log(`| ${agent} | ${s.n} | ${pct(s.end, s.n)} (${s.end}) | ${pct(s.first, s.n)} (${s.first}) | ${pct(s.last, s.n)} (${s.last}) | ${pct(s.uniform, s.n)} |`);
+}
+
 async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
   const f = flags(rest);
@@ -171,7 +209,8 @@ async function main(): Promise<void> {
   if (command === 'replay') return replay(rest[0]);
   if (command === 'run') return run(f);
   if (command === 'report') return report(rest[0]);
-  throw new Error('usage: bench play|replay|run|report (see the header of bench/cli.ts)');
+  if (command === 'positions') return positions(rest);
+  throw new Error('usage: bench play|replay|run|report|positions (see the header of bench/cli.ts)');
 }
 
 main().catch((err: unknown) => {
