@@ -235,3 +235,8 @@ only.
 - v4.2, 2026-11-20 (recorded after the run): batch 6 was cut by the owner at 13:15. Seeds
   100001-100006 are kept; the partial seed 100007 is dropped. Q11 reduced to 2 log replays (no seed
   replays). Reported as incomplete; game counts in the paper.
+- v4.3, 2026-11-20 (written before the extra games): the owner asked for firmer numbers at the lowest
+  GPU cost. Batch 6 continues on seeds 100007-100025 for the typed agents only, against `random`
+  and `rule` (both seats; seed 100007 is replayed in full). The free agents and the typed agents vs
+  `search` are not continued, because their first games already gave a one-sided result (reported
+  in the paper). Reported with the pairings' different game counts.
