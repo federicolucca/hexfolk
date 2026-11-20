@@ -232,3 +232,6 @@ only.
 - v4, 2026-11-20: adds local agents over Ollama and questions Q10-Q16, Q15 dropped (amendment above).
 - v4.1, 2026-11-20: pilot settings of v4 fixed (timeout, test seeds, batch 6 pairings, skipped
   paid parts), before any local test game.
+- v4.2, 2026-11-20 (recorded after the run): batch 6 was cut by the owner at 13:15. Seeds
+  100001-100006 are kept; the partial seed 100007 is dropped. Q11 reduced to 2 log replays (no seed
+  replays). Reported as incomplete; game counts in the paper.
