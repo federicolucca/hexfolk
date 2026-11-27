@@ -14,7 +14,7 @@ short, readable at a glance and playable one-handed on a phone. Each game is set
 themes (greenlands, drylands, icelands, deadlands) with its own hand-drawn-style tile art, drawn on
 a canvas. There is no backend and nothing to install.
 
-### Rules (v0.2)
+### Rules (v1.0.0, frozen for the benchmark at tag `bench-v1`)
 
 - **Map:** 11x11 pointy-top hexes, generated from a seed. Terrains: grass, forest, hill, mountain, water.
   Forests, hills and mountains end a unit's move when it enters them (mountains need Climbing).
@@ -91,27 +91,26 @@ npm run atlas    # rebuild the tile atlas after changing assets/raw/tiles
 
 ## Roadmap
 
-v0.1 is built in milestones. Each one was playable, tested and committed:
+Done:
 
-1. **Plan:** architecture, data model and module list (`docs/PLAN.md`) ✅
-2. **Map:** procedural map, rendering, pan and zoom ✅
-3. **Units:** the four unit types and movement ✅
-4. **Cities and economy:** stars, growth, levels, village capture ✅
-5. **Techs and combat:** the six techs, walls and deterministic combat ✅
-6. **AI:** greedy heuristic opponents behind the `Agent` interface ✅
-7. **Release:** autosave, victory conditions, docs, GitHub Pages deploy ✅
+- **v0.1:** the playable game, built in milestones (plan, map, units, cities and economy, techs and
+  combat, greedy AI, autosave, victory, GitHub Pages deploy).
+- **v1.0.0:** the rules described above, frozen for the benchmark.
+- **Agents and benchmark (tag `bench-v1`):** the headless `Agent` interface, the simulator, the MCP server
+  (`packages/mcp`), the replay viewer, six reference baselines and the pre-registered benchmark of
+  language and decision models (`docs/PROTOCOL.md`, protocol v1–v5).
 
-v0.1 is playable: 1 human against 1 to 3 AIs, ending by domination or the highest score on turn 30.
-
-After v0.1, possible additions include more tribes, a minimax AI, larger maps and more techs and
-units. None of these are planned yet.
+Next (not scheduled yet): more agents run through the frozen v1.0.0 rules and harness, and, for the game
+itself, more tribes, larger maps and more techs and units. Rule changes would get a new version, so
+`bench-v1` stays reproducible.
 
 ## Agents & MCP
 
 hexfolk is also a small testbed for game-playing agents. The rules live in a pure, deterministic TypeScript
 engine (`src/core`: `newGame`, `observe`, `legalActions`, `step`), so the same code runs in the browser, in a
 headless simulator and behind an MCP server. There is no fog of war: `observe()` returns the whole board.
-The harness ships with three built-in baselines (`random`, `greedy-easy`, `greedy-normal`).
+The harness ships with six built-in baselines: `random`, `greedy-easy`, `greedy-normal`, `rule`, `lookahead`
+and `search`. The benchmark table below uses five of them (all but `greedy-easy`).
 
 **MCP server** (`packages/mcp`, stdio, official `@modelcontextprotocol/sdk`). Its dependencies live in
 `packages/mcp/package.json` only: they never enter the browser bundle or the root `package.json`.
@@ -146,8 +145,8 @@ when it passes, the turn ends by default (`end_turn`). The turn only ends when t
 from both seats on each seed (mirrored; 42 matches for 7 seeds), and writes JSONL replays plus `results.md`
 (win rate with a 95% Wilson interval, Elo, average turns, illegal-action rate, timeouts, decision latency)
 to `sim-out/` (gitignored). Options: `--first-seed`, `--turn-limit`, `--agents a,b`, `--out`,
-`--timeout-ms`. Plugging in an external MCP/LLM agent is future work: an `Agent` whose `decide()` calls
-out would do it; the sim makes no network calls and needs no API keys.
+`--timeout-ms`. The sim makes no network calls and needs no API keys. External language-model agents plug
+in through the same `Agent` interface (`npm run bench`, see Benchmark below) or over MCP (`packages/mcp`).
 
 **Replay viewer.** Open the game with `?replay=<url>` (for example `?replay=replays/sample.jsonl`) or use
 the Replay button to load a `.jsonl` file, then step with first / previous / play / next / last.
