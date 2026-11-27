@@ -4,9 +4,6 @@ A minimal turn-based 4X strategy game on a hex map, playable in desktop and mobi
 Explore, expand, exploit and exterminate on a small procedurally generated island, against AI rivals,
 in under 30 turns.
 
-> **Status: map milestone.** A seeded island you can pan, zoom and inspect. Units and rules come
-> next; this README describes what v0.1 will be.
-
 **Demo:** https://federicolucca.github.io/hexfolk/ (add `?seed=123` for a given map, `&theme=icelands`
 to pick the theme, `&players=2` for fewer capitals)
 
@@ -114,8 +111,7 @@ units. None of these are planned yet.
 hexfolk is also a small testbed for game-playing agents. The rules live in a pure, deterministic TypeScript
 engine (`src/core`: `newGame`, `observe`, `legalActions`, `step`), so the same code runs in the browser, in a
 headless simulator and behind an MCP server. There is no fog of war: `observe()` returns the whole board.
-No LLM results exist yet; what is here is the harness and three built-in baselines (`random`, `greedy-easy`,
-`greedy-normal`).
+The harness ships with three built-in baselines (`random`, `greedy-easy`, `greedy-normal`).
 
 **MCP server** (`packages/mcp`, stdio, official `@modelcontextprotocol/sdk`). Its dependencies live in
 `packages/mcp/package.json` only: they never enter the browser bundle or the root `package.json`.
@@ -155,6 +151,81 @@ out would do it; the sim makes no network calls and needs no API keys.
 
 **Replay viewer.** Open the game with `?replay=<url>` (for example `?replay=replays/sample.jsonl`) or use
 the Replay button to load a `.jsonl` file, then step with first / previous / play / next / last.
+
+## Benchmark
+
+hexfolk is the game of the paper *Legal Is Not Good: A Pre-Registered Benchmark of Low-Cost Language and
+Decision Models on a New Strategy Game* ([arXiv:2611.28713](https://arxiv.org/abs/2611.28713)). The code it
+used is the tag [`bench-v1`](https://github.com/federicolucca/hexfolk/tree/bench-v1): the engine (rules
+v1.0.0, frozen), the benchmark harness and its agents, and the pre-registered protocol
+[`docs/PROTOCOL.md`](docs/PROTOCOL.md) with its version history v1–v5.
+
+To replay the games, check out the tag and use `npm run bench` (`bench/cli.ts` lists every option):
+
+```sh
+git checkout bench-v1
+npm install
+# Batch 5 and batch 1: free reference players, seeds 100001–100100, no API key needed
+npm run bench -- run --set test --seeds 100 --out bench-out/batch5 \
+  --pairs search:greedy-normal,search:rule,search:lookahead,search:random
+npm run bench -- run --set test --seeds 100 --out bench-out/batch1 \
+  --pairs greedy-normal:rule,greedy-normal:lookahead,greedy-normal:random,rule:lookahead,rule:random,lookahead:random
+npm run bench -- report bench-out/batch5
+```
+
+Model agents use the same command with their names in `--pairs` and `--seeds 25` (seeds 100001–100025):
+hosted ones need `OPENROUTER_API_KEY`, local ones (`localllama8b-*`, `localqwen7b-*`) an Ollama server in
+`OLLAMA_URL`. The exact pairings of each batch are in `docs/PROTOCOL.md`.
+
+Results (Table 2 of the paper). Head to head on the test seeds, both seats. In paid batches the paid agent
+is A (in batch 3, the typed agent). A/B wins in % with 95% Wilson intervals; D = draws; verdict by
+non-overlapping intervals. Batch 5 (search, the ceiling) is listed first. Batch 6 lists its 50-game
+pairings; its 12-game pairings are in the paper's Appendix D. Batch 7 is the option-order control.
+
+| A | B | n | A wins % [95% CI] | B wins % [95% CI] | D | Verdict |
+|---|---|--:|--:|--:|--:|---|
+| **Batch 5 (free search ceiling, protocol v3, seeds 100001–100100)** | | | | | | |
+| search | greedy-normal | 200 | 91.0 [86.2, 94.2] | 8.5 [5.4, 13.2] | 1 | search better |
+| search | rule | 200 | 95.0 [91.0, 97.3] | 4.5 [2.4, 8.3] | 1 | search better |
+| search | lookahead | 200 | 89.0 [83.9, 92.6] | 8.0 [5.0, 12.6] | 6 | search better |
+| search | random | 200 | 100.0 [98.1, 100.0] | 0.0 [0.0, 1.9] | 0 | search better |
+| **Batch 1 (free references, seeds 100001–100100)** | | | | | | |
+| greedy-normal | rule | 200 | 65.0 [58.2, 71.3] | 32.0 [25.9, 38.8] | 6 | greedy-normal better |
+| greedy-normal | lookahead | 200 | 71.5 [64.9, 77.3] | 27.0 [21.3, 33.5] | 3 | greedy-normal better |
+| greedy-normal | random | 200 | 98.0 [95.0, 99.2] | 2.0 [0.8, 5.0] | 0 | greedy-normal better |
+| rule | lookahead | 200 | 69.0 [62.3, 75.0] | 30.0 [24.1, 36.7] | 2 | rule better |
+| rule | random | 200 | 98.0 [95.0, 99.2] | 2.0 [0.8, 5.0] | 0 | rule better |
+| lookahead | random | 200 | 97.0 [93.6, 98.6] | 3.0 [1.4, 6.4] | 0 | lookahead better |
+| **Batch 2 (language models vs. references, seeds 100001–100025)** | | | | | | |
+| llama8b-typed | rule | 50 | 0.0 [0.0, 7.1] | 100.0 [92.9, 100.0] | 0 | rule better |
+| ministral3b-typed | rule | 50 | 0.0 [0.0, 7.1] | 100.0 [92.9, 100.0] | 0 | rule better |
+| llama8b-free | rule | 50 | 0.0 [0.0, 7.1] | 100.0 [92.9, 100.0] | 0 | rule better |
+| ministral3b-free | rule | 50 | 0.0 [0.0, 7.1] | 100.0 [92.9, 100.0] | 0 | rule better |
+| llama8b-typed | random | 50 | 10.0 [4.3, 21.4] | 74.0 [60.4, 84.1] | 8 | random better |
+| ministral3b-typed | random | 50 | 2.0 [0.4, 10.5] | 94.0 [83.8, 97.9] | 2 | random better |
+| llama8b-free | random | 50 | 0.0 [0.0, 7.1] | 100.0 [92.9, 100.0] | 0 | random better |
+| ministral3b-free | random | 50 | 0.0 [0.0, 7.1] | 100.0 [92.9, 100.0] | 0 | random better |
+| **Batch 3 (typed vs. free, same model, seeds 100001–100025)** | | | | | | |
+| llama8b-typed | llama8b-free | 50 | 82.0 [69.2, 90.2] | 10.0 [4.3, 21.4] | 4 | llama8b-typed better |
+| ministral3b-typed | ministral3b-free | 50 | 76.0 [62.6, 85.7] | 20.0 [11.2, 33.0] | 2 | ministral3b-typed better |
+| **Batch 4 run 2 (decision models, seeds 100001–100025)** | | | | | | |
+| gemini-decision | rule | 50 | 0.0 [0.0, 7.1] | 100.0 [92.9, 100.0] | 0 | rule better |
+| nimble-decision | rule | 50 | 40.0 [27.6, 53.8] | 54.0 [40.4, 67.0] | 3 | n.d. |
+| gemini-decision | lookahead | 50 | 22.0 [12.8, 35.2] | 76.0 [62.6, 85.7] | 1 | lookahead better |
+| nimble-decision | lookahead | 50 | 64.0 [50.1, 75.9] | 36.0 [24.1, 49.9] | 0 | nimble-decision better |
+| gemini-decision | random | 50 | 80.0 [67.0, 88.8] | 18.0 [9.8, 30.8] | 1 | gemini-decision better |
+| nimble-decision | random | 50 | 100.0 [92.9, 100.0] | 0.0 [0.0, 7.1] | 0 | nimble-decision better |
+| **Batch 6 (local typed agents, v4–v4.3, seeds 100001–100025)** | | | | | | |
+| localllama8b-typed | rule | 50 | 0.0 [0.0, 7.1] | 100.0 [92.9, 100.0] | 0 | rule better |
+| localqwen7b-typed | rule | 50 | 0.0 [0.0, 7.1] | 100.0 [92.9, 100.0] | 0 | rule better |
+| localllama8b-typed | random | 50 | 4.0 [1.1, 13.5] | 60.0 [46.2, 72.4] | 18 | random better |
+| localqwen7b-typed | random | 50 | 30.0 [19.1, 43.8] | 40.0 [27.6, 53.8] | 15 | n.d. |
+| **Batch 7 (option-order control: local typed agents, shuffled order, v5, seeds 100001–100025)** | | | | | | |
+| localllama8b-typed-shuffled | random | 50 | 18.0 [9.8, 30.8] | 40.0 [27.6, 53.8] | 21 | n.d. |
+| localqwen7b-typed-shuffled | random | 50 | 22.0 [12.8, 35.2] | 56.0 [42.3, 68.8] | 11 | random better |
+
+The per-game results and game logs are not in the repository; see the paper's Code and Data Availability
+section.
 
 ## Contributing
 
